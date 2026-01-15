@@ -16,6 +16,7 @@ const AddProductForm = ({ onProductAdded }) => {
     price: '',
     quantity: '',
     unit: 'pc',
+    expiry_date: '',
     description: '',
   });
 
@@ -49,8 +50,8 @@ const AddProductForm = ({ onProductAdded }) => {
 
     try {
       // Validate required fields
-      if (!formData.name || !formData.product_type || !formData.price || !formData.quantity) {
-        throw new Error('Name, product type, price, and quantity are required');
+      if (!formData.name || !formData.product_type || !formData.price || !formData.quantity || !formData.expiry_date) {
+        throw new Error('Name, product type, price, quantity, and expiry date are required');
       }
 
       // Convert numeric fields
@@ -72,6 +73,7 @@ const AddProductForm = ({ onProductAdded }) => {
         price: '',
         quantity: '',
         unit: 'pc',
+        expiry_date: '',
         description: '',
       });
 
@@ -201,6 +203,18 @@ const AddProductForm = ({ onProductAdded }) => {
             onChange={handleChange}
             className="input-field"
             placeholder="e.g., pc, bottle, gm, ml"
+          />
+        </div>
+
+        <div>
+          <label className="block font-semibold mb-2">Expiry Date *</label>
+          <input
+            type="date"
+            name="expiry_date"
+            value={formData.expiry_date}
+            onChange={handleChange}
+            className="input-field"
+            min={new Date().toISOString().split('T')[0]}
           />
         </div>
 

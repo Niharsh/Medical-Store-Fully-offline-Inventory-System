@@ -67,6 +67,7 @@ List all products with filtering support.
       "price": "25.50",
       "quantity": 150,
       "unit": "pc",
+      "expiry_date": "2026-12-31",
       "description": "Pain reliever and fever reducer",
       "created_at": "2024-01-15T10:30:00Z",
       "updated_at": "2024-01-15T10:30:00Z"
@@ -81,6 +82,7 @@ List all products with filtering support.
       "price": "150.00",
       "quantity": 50,
       "unit": "bottle",
+      "expiry_date": "2026-06-30",
       "description": "Cough suppressant syrup",
       "created_at": "2024-01-15T10:30:00Z",
       "updated_at": "2024-01-15T10:30:00Z"
@@ -94,6 +96,7 @@ List all products with filtering support.
 - `price` is the selling price (used for display, not calculations)
 - `quantity` is current stock level
 - `unit` indicates the unit of sale (pc, bottle, gm, ml, etc.) - flexible per product
+- `expiry_date` is mandatory, format: YYYY-MM-DD (e.g., 2026-12-31)
 - Pagination is handled by DRF defaults
 
 ---
@@ -113,6 +116,7 @@ Create a new product.
   "price": "25.50",
   "quantity": 100,
   "unit": "pc",
+  "expiry_date": "2026-12-31",
   "description": "Pain reliever"
 }
 ```
@@ -129,10 +133,12 @@ Create a new product.
   "price": "25.50",
   "quantity": 100,
   "unit": "pc",
+  "expiry_date": "2026-12-31",
   "description": "Pain reliever",
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
 }
+```
 ```
 
 **Validation** (Backend):
@@ -141,6 +147,7 @@ Create a new product.
 - `price` must be >= 0
 - `quantity` must be >= 0
 - `unit` should be flexible per product (pc, bottle, gm, ml, etc.)
+- `expiry_date` is required, format: YYYY-MM-DD, must be today or in the future
 - `salt_composition` is optional, mainly for tablets/capsules (max 500 chars)
 
 ---

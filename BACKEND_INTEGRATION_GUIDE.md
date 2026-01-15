@@ -101,6 +101,9 @@ class Product(models.Model):
         default='pc',
         help_text="Unit of sale (pc, bottle, gm, ml, etc.) - flexible per product"
     )
+    expiry_date = models.DateField(
+        help_text="Expiry date of the product. Format: YYYY-MM-DD. Required for all products."
+    )
     salt_composition = models.CharField(
         max_length=500,
         blank=True,
@@ -115,6 +118,7 @@ class Product(models.Model):
         indexes = [
             models.Index(fields=['product_type']),
             models.Index(fields=['quantity']),
+            models.Index(fields=['expiry_date']),
         ]
 
     def __str__(self):
