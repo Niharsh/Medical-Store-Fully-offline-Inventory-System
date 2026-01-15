@@ -41,23 +41,56 @@ Create Django models matching these specifications:
 from django.db import models
 from decimal import Decimal
 
+class ProductType(models.Model):
+    """Custom product types - allows owner to add types beyond defaults"""
+    DEFAULT_TYPES = [
+        'tablet', 'syrup', 'powder', 'cream', 'diaper', 'condom', 'sachet'
+    ]
+    
+    name = models.CharField(
+        max_length=50,
+        unique=True,
+        primary_key=True,
+        help_text="Unique identifier (lowercase, alphanumeric + underscore). E.g., 'tablet', 'gel', 'spray'"
+    )
+    label = models.CharField(
+        max_length=100,
+        help_text="Display label. E.g., 'Tablet', 'Gel', 'Spray'"
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text="True for built-in types (tablet, syrup, powder, cream, diaper, condom, sachet)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['is_default', 'label']
+    
+    def __str__(self):
+        return f"{self.label} ({self.name})"
+    
+    @classmethod
+    def create_defaults(cls):
+        """Create default product types if they don't exist"""
+        defaults = [
+            ('tablet', 'Tablet'),
+            ('syrup', 'Syrup'),
+            ('powder', 'Powder'),
+            ('cream', 'Cream'),
+            ('diaper', 'Diaper'),
+            ('condom', 'Condom'),
+            ('sachet', 'Sachet'),
+        ]
+        for name, label in defaults:
+            cls.objects.get_or_create(name=name, defaults={'label': label, 'is_default': True})
+
 class Product(models.Model):
     """Product in medical store inventory (tablets, syrups, powders, creams, etc.)"""
-    PRODUCT_TYPE_CHOICES = [
-        ('tablet', 'Tablet'),
-        ('syrup', 'Syrup'),
-        ('powder', 'Powder'),
-        ('cream', 'Cream'),
-        ('diaper', 'Diaper'),
-        ('condom', 'Condom'),
-        ('sachet', 'Sachet'),
-    ]
     
     name = models.CharField(max_length=255, unique=True)
     product_type = models.CharField(
         max_length=50,
-        choices=PRODUCT_TYPE_CHOICES,
-        help_text="Type of product (tablet, syrup, powder, cream, diaper, condom, sachet)"
+        help_text="Type of product (references ProductType.name). Can be default or custom type."
     )
     generic_name = models.CharField(max_length=255, blank=True)
     manufacturer = models.CharField(max_length=255, blank=True)
@@ -85,7 +118,7 @@ class Product(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.get_product_type_display()})"
+        return f"{self.name} ({self.product_type})"
 
 
 class Batch(models.Model):

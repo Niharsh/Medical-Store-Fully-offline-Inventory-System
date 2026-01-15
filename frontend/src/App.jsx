@@ -6,6 +6,7 @@ import Navigation from './components/Common/Navigation';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Billing from './pages/Billing';
+import Settings from './pages/Settings';
 import './App.css';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/billing" element={<Billing />} />
+                <Route path="/settings" element={<Settings />} />
               </Routes>
             </main>
           </div>

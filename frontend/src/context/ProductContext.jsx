@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { productService } from '../services/medicineService';
+import productTypeService from '../services/productTypeService';
 
 /**
  * ProductContext - Manages state for generic medical store products
@@ -7,20 +8,24 @@ import { productService } from '../services/medicineService';
  * Supports all product types: tablets, syrups, powders, creams, diapers, condoms, sachets, etc.
  * Each product includes a product_type field indicating its category.
  * 
+ * Also manages custom product types that can be added by the owner.
+ * 
  * Backend is responsible for:
  * - Product type validation
  * - Stock management
  * - Data persistence
+ * - Custom product type storage
  * 
  * Frontend only:
  * - Displays product type
- * - Calls API to fetch/create/update/delete products
+ * - Calls API to fetch/create/update/delete products and product types
  * - No type-specific logic in frontend
  */
 const ProductContext = createContext();
 
 export const ProductProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -84,8 +89,48 @@ export const ProductProvider = ({ children }) => {
     }
   }, []);
 
+  // Fetch all available product types (defaults + custom)
+  const fetchProductTypes = useCallback(async () => {
+    try {
+      const types = await productTypeService.getAll();
+      setProductTypes(types);
+      return types;
+    } catch (err) {
+      console.error('Failed to fetch product types:', err);
+      setError(err.message);
+      // Return defaults on error
+      return productTypeService.getDefaults();
+    }
+  }, []);
+
+  // Add a new custom product type
+  const addProductType = useCallback(async (typeData) => {
+    try {
+      const newType = await productTypeService.create(typeData);
+      setProductTypes([...productTypes, newType]);
+      return newType;
+    } catch (err) {
+      const message = err.message || 'Failed to add product type';
+      setError(message);
+      throw err;
+    }
+  }, [productTypes]);
+
+  // Delete a custom product type
+  const deleteProductType = useCallback(async (typeId) => {
+    try {
+      await productTypeService.delete(typeId);
+      setProductTypes(productTypes.filter(t => t.id !== typeId));
+    } catch (err) {
+      const message = err.message || 'Failed to delete product type';
+      setError(message);
+      throw err;
+    }
+  }, [productTypes]);
+
   const value = {
     products,
+    productTypes,
     loading,
     error,
     fetchProducts,
@@ -93,6 +138,9 @@ export const ProductProvider = ({ children }) => {
     updateProduct,
     deleteProduct,
     getLowStock,
+    fetchProductTypes,
+    addProductType,
+    deleteProductType,
   };
 
   return (

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProducts } from '../../context/ProductContext';
 import ErrorAlert from '../Common/ErrorAlert';
 
 const AddProductForm = ({ onProductAdded }) => {
-  const { addProduct, error } = useProducts();
+  const { addProduct, error, productTypes, fetchProductTypes } = useProducts();
   const [formError, setFormError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [typesLoading, setTypesLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     product_type: 'tablet',
@@ -18,15 +19,20 @@ const AddProductForm = ({ onProductAdded }) => {
     description: '',
   });
 
-  const productTypes = [
-    { value: 'tablet', label: 'Tablet' },
-    { value: 'syrup', label: 'Syrup' },
-    { value: 'powder', label: 'Powder' },
-    { value: 'cream', label: 'Cream' },
-    { value: 'diaper', label: 'Diaper' },
-    { value: 'condom', label: 'Condom' },
-    { value: 'sachet', label: 'Sachet' },
-  ];
+  // Load product types on component mount
+  useEffect(() => {
+    const loadTypes = async () => {
+      try {
+        setTypesLoading(true);
+        await fetchProductTypes();
+      } catch (err) {
+        console.error('Failed to load product types:', err);
+      } finally {
+        setTypesLoading(false);
+      }
+    };
+    loadTypes();
+  }, [fetchProductTypes]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -102,18 +108,23 @@ const AddProductForm = ({ onProductAdded }) => {
 
         <div>
           <label className="block font-semibold mb-2">Product Type *</label>
-          <select
-            name="product_type"
-            value={formData.product_type}
-            onChange={handleChange}
-            className="input-field"
-          >
-            {productTypes.map(type => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
+          {typesLoading ? (
+            <div className="input-field bg-gray-100 text-gray-500">Loading types...</div>
+          ) : (
+            <select
+              name="product_type"
+              value={formData.product_type}
+              onChange={handleChange}
+              className="input-field"
+            >
+              <option value="">-- Select Product Type --</option>
+              {productTypes.map(type => (
+                <option key={type.id} value={type.id}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div>

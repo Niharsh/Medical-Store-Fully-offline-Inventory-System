@@ -30,6 +30,14 @@ const Navigation = () => {
               Billing
             </Link>
           </li>
+          <li>
+            <Link
+              to="/settings"
+              className="hover:text-sky-400 transition-colors"
+            >
+              Settings
+            </Link>
+          </li>
         </ul>
       </div>
     </nav>

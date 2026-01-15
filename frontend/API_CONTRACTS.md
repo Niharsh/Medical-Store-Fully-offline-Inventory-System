@@ -195,6 +195,111 @@ Delete a product.
 
 ---
 
+## 2. Product Types Endpoint
+
+### GET /product-types/
+
+List all available product types (default + custom).
+
+**Expected Response**:
+```json
+[
+  {
+    "id": "tablet",
+    "label": "Tablet",
+    "is_default": true
+  },
+  {
+    "id": "syrup",
+    "label": "Syrup",
+    "is_default": true
+  },
+  {
+    "id": "powder",
+    "label": "Powder",
+    "is_default": true
+  },
+  {
+    "id": "cream",
+    "label": "Cream",
+    "is_default": true
+  },
+  {
+    "id": "diaper",
+    "label": "Diaper",
+    "is_default": true
+  },
+  {
+    "id": "condom",
+    "label": "Condom",
+    "is_default": true
+  },
+  {
+    "id": "sachet",
+    "label": "Sachet",
+    "is_default": true
+  },
+  {
+    "id": "gel",
+    "label": "Gel",
+    "is_default": false
+  }
+]
+```
+
+**Notes**:
+- Returns both default product types and custom types added by the owner
+- Default types have `is_default: true`
+- Custom types have `is_default: false`
+- Owner cannot delete default types
+
+---
+
+### POST /product-types/
+
+Create a new custom product type.
+
+**Request Body**:
+```json
+{
+  "name": "gel",
+  "label": "Gel"
+}
+```
+
+**Expected Response**: 201 Created
+```json
+{
+  "id": "gel",
+  "label": "Gel",
+  "is_default": false
+}
+```
+
+**Validation** (Backend):
+- `name` is required, unique, lowercase, alphanumeric + underscores (max 50 chars)
+- `label` is required, readable display name (max 100 chars)
+- Cannot have same name as default type
+
+**Error Handling**:
+- 400 Bad Request if `name` already exists: `{"name": ["Product type with this name already exists"]}`
+- 400 Bad Request if invalid characters in `name`
+
+---
+
+### DELETE /product-types/{id}/
+
+Delete a custom product type.
+
+**Expected Response**: 204 No Content
+
+**Validation** (Backend):
+- Cannot delete default types (tablet, syrup, powder, cream, diaper, condom, sachet)
+- 403 Forbidden if attempting to delete default type
+- 404 Not Found if product type doesn't exist
+
+---
+
 ## 2. Batches Endpoint
 
 ### GET /batches/
