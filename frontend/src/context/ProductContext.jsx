@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { productService } from '../services/medicineService';
 import productTypeService from '../services/productTypeService';
+import hsnService from '../services/hsnService';
 
 /**
  * ProductContext - Manages state for generic medical store products
@@ -26,6 +27,7 @@ const ProductContext = createContext();
 export const ProductProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
   const [productTypes, setProductTypes] = useState([]);
+  const [hsns, setHSNs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -35,7 +37,9 @@ export const ProductProvider = ({ children }) => {
     setError(null);
     try {
       const data = await productService.getAll(params);
-      setProducts(Array.isArray(data) ? data : data.results || []);
+      const productList = Array.isArray(data) ? data : data.results || [];
+      console.log('📥 ProductContext.fetchProducts: Fetched', productList.length, 'products with batches:', productList);
+      setProducts(productList);
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
       console.error('Failed to fetch products:', err);
@@ -47,37 +51,52 @@ export const ProductProvider = ({ children }) => {
   // Add product (requires product_type field)
   const addProduct = useCallback(async (productData) => {
     try {
+      setError(null);
       const newProduct = await productService.create(productData);
-      setProducts([...products, newProduct]);
+      setProducts(prevProducts => [...prevProducts, newProduct]);
       return newProduct;
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
       throw err;
     }
-  }, [products]);
+  }, []);
 
   // Update product
-  const updateProduct = useCallback(async (id, productData) => {
+  const updateProduct = useCallback(async (id, payload) => {
     try {
-      const updated = await productService.update(id, productData);
-      setProducts(products.map(p => p.id === id ? updated : p));
-      return updated;
+      setError(null);
+    
+      const updatedProduct = await productService.update(id, payload);
+    
+      setProducts(prev =>
+        prev.map(p => (p.id === id ? updatedProduct : p))
+      );
+    
+      console.log('✅ ProductContext.updateProduct: updated', updatedProduct);
+    
+      return updatedProduct;
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
+      console.error('❌ Failed to update product:', err);
       throw err;
     }
-  }, [products]);
+  }, []);
+
+
 
   // Delete product
   const deleteProduct = useCallback(async (id) => {
     try {
+      setError(null);
       await productService.delete(id);
-      setProducts(products.filter(p => p.id !== id));
+      setProducts(prevProducts => prevProducts.filter(p => p.id !== id));
+      console.log('✅ ProductContext.deleteProduct: Product', id, 'deleted successfully');
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
+      console.error('❌ ProductContext.deleteProduct: Failed to delete product', id, err);
       throw err;
     }
-  }, [products]);
+  }, []);
 
   // Get low stock products
   const getLowStock = useCallback(async (threshold = 10) => {
@@ -107,30 +126,84 @@ export const ProductProvider = ({ children }) => {
   const addProductType = useCallback(async (typeData) => {
     try {
       const newType = await productTypeService.create(typeData);
-      setProductTypes([...productTypes, newType]);
+      setProductTypes(prevTypes => [...prevTypes, newType]);
       return newType;
     } catch (err) {
       const message = err.message || 'Failed to add product type';
       setError(message);
       throw err;
     }
-  }, [productTypes]);
+  }, []);
 
   // Delete a custom product type
   const deleteProductType = useCallback(async (typeId) => {
     try {
       await productTypeService.delete(typeId);
-      setProductTypes(productTypes.filter(t => t.id !== typeId));
+      setProductTypes(prevTypes => prevTypes.filter(t => t.id !== typeId));
     } catch (err) {
       const message = err.message || 'Failed to delete product type';
       setError(message);
       throw err;
     }
-  }, [productTypes]);
+  }, []);
+
+  // Fetch all HSN codes
+  const fetchHSNs = useCallback(async () => {
+    try {
+      const codes = await hsnService.getAll();
+      setHSNs(codes);
+      return codes;
+    } catch (err) {
+      console.error('Failed to fetch HSN codes:', err);
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  // Add a new HSN code
+  const addHSN = useCallback(async (hsnData) => {
+    try {
+      const newHSN = await hsnService.create(hsnData);
+      setHSNs(prevHSNs => [...prevHSNs, newHSN]);
+      return newHSN;
+    } catch (err) {
+      const message = err.message || 'Failed to add HSN code';
+      setError(message);
+      throw err;
+    }
+  }, []);
+
+  // Update an HSN code
+  const updateHSN = useCallback(async (hsnCode, hsnData) => {
+    try {
+      const updatedHSN = await hsnService.update(hsnCode, hsnData);
+      setHSNs(prevHSNs => 
+        prevHSNs.map(h => h.hsn_code === hsnCode ? updatedHSN : h)
+      );
+      return updatedHSN;
+    } catch (err) {
+      const message = err.message || 'Failed to update HSN code';
+      setError(message);
+      throw err;
+    }
+  }, []);
+
+  // Delete an HSN code
+  const deleteHSN = useCallback(async (hsnCode) => {
+    try {
+      await hsnService.delete(hsnCode);
+      setHSNs(prevHSNs => prevHSNs.filter(h => h.hsn_code !== hsnCode));
+    } catch (err) {
+      const message = err.message || 'Failed to delete HSN code';
+      setError(message);
+      throw err;
+    }
+  }, []);
 
   const value = {
     products,
     productTypes,
+    hsns,
     loading,
     error,
     fetchProducts,
@@ -141,6 +214,10 @@ export const ProductProvider = ({ children }) => {
     fetchProductTypes,
     addProductType,
     deleteProductType,
+    fetchHSNs,
+    addHSN,
+    updateHSN,
+    deleteHSN,
   };
 
   return (

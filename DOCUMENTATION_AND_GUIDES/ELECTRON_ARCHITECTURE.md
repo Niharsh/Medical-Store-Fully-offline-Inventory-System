@@ -1,0 +1,484 @@
+# Electron Architecture Diagram
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      CHOUDHARY MEDICAL STORE                        │
+│                    Desktop Billing Application                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        WINDOWS DESKTOP                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │              ELECTRON MAIN PROCESS (main.js)               │   │
+│  │                                                             │   │
+│  │  • Load URL (dev: localhost:5173, prod: dist/index.html)   │   │
+│  │  • Create BrowserWindow (1400x900)                         │   │
+│  │  • App lifecycle (create, close, activate)                 │   │
+│  │  • Menu (File, Edit, View)                                │   │
+│  │  • Dev/Prod mode detection                                │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                             │                                       │
+│                    ┌────────┴────────┐                             │
+│                    │                 │                             │
+│         ┌──────────▼───────┐  ┌──────▼──────────┐                │
+│         │   DEV MODE       │  │  PRODUCTION     │                │
+│         │                  │  │                 │                │
+│         │ Loads:           │  │ Loads:          │                │
+│         │ http://          │  │ frontend/dist/  │                │
+│         │ localhost:5173   │  │ index.html      │                │
+│         │                  │  │ (static files)  │                │
+│         └──────────┬───────┘  └────────┬────────┘                │
+│                    │                   │                          │
+│                    └─────────┬─────────┘                          │
+│                              │                                    │
+│         ┌────────────────────▼────────────────────┐             │
+│         │    ELECTRON RENDERER (Preload.js)      │             │
+│         │                                        │             │
+│         │  • contextIsolation: true              │             │
+│         │  • nodeIntegration: false              │             │
+│         │  • Minimal API exposure                │             │
+│         │    - platform, arch only               │             │
+│         └────────────────┬───────────────────────┘             │
+│                          │                                      │
+│         ┌────────────────▼────────────────────┐                │
+│         │     REACT APPLICATION (dist/)       │                │
+│         │                                    │                │
+│         │  ┌──────────────────────────────┐ │                │
+│         │  │ React Root (index.html)     │ │                │
+│         │  │                              │ │                │
+│         │  │ ┌──────────────────────────┐ │ │                │
+│         │  │ │ App.jsx                  │ │ │                │
+│         │  │ │                          │ │ │                │
+│         │  │ │ ┌────────────────────┐  │ │ │                │
+│         │  │ │ │  Auth Context      │  │ │ │                │
+│         │  │ │ │  ProductContext    │  │ │ │                │
+│         │  │ │ │  InvoiceContext    │  │ │ │                │
+│         │  │ │ │  HSN Context       │  │ │ │                │
+│         │  │ │ │  (etc)             │  │ │ │                │
+│         │  │ │ └────────────────────┘  │ │ │                │
+│         │  │ │                          │ │ │                │
+│         │  │ │ ┌────────────────────┐  │ │ │                │
+│         │  │ │ │ React Router       │  │ │ │                │
+│         │  │ │ │                    │  │ │ │                │
+│         │  │ │ │ /dashboard         │  │ │ │                │
+│         │  │ │ │ /billing           │  │ │ │                │
+│         │  │ │ │ /inventory         │  │ │ │                │
+│         │  │ │ │ /settings          │  │ │ │                │
+│         │  │ │ │ /login             │  │ │ │                │
+│         │  │ │ └────────────────────┘  │ │ │                │
+│         │  │ │                          │ │ │                │
+│         │  │ │ ┌────────────────────┐  │ │ │                │
+│         │  │ │ │ Pages & Components │  │ │ │                │
+│         │  │ │ │                    │  │ │ │                │
+│         │  │ │ │ - Billing          │  │ │ │                │
+│         │  │ │ │ - Inventory        │  │ │ │                │
+│         │  │ │ │ - Invoices         │  │ │ │                │
+│         │  │ │ │ - Reports          │  │ │ │                │
+│         │  │ │ │ - Settings         │  │ │ │                │
+│         │  │ │ └────────────────────┘  │ │ │                │
+│         │  │ └──────────────────────────┘ │ │                │
+│         │  │                              │ │                │
+│         │  │ ┌──────────────────────────┐ │ │                │
+│         │  │ │ Print (window.print())   │ │ │                │
+│         │  │ │ • Uses @media print CSS  │ │ │                │
+│         │  │ │ • Print dialog works     │ │ │                │
+│         │  │ │ • Half A4 format         │ │ │                │
+│         │  │ └──────────────────────────┘ │ │                │
+│         │  └──────────────────────────────┘ │                │
+│         │                                    │                │
+│         │ ┌──────────────────────────────┐   │                │
+│         │ │ API Service Layer            │   │                │
+│         │ │ (fetch to backend)           │   │                │
+│         │ │                              │   │                │
+│         │ │ • No IPC required            │   │                │
+│         │ │ • Standard HTTP calls        │   │                │
+│         │ │ • localStorage caching       │   │                │
+│         │ │ • Offline fallback           │   │                │
+│         │ └──────────────────────────────┘   │                │
+│         │                                    │                │
+│         └────────────────┬───────────────────┘                │
+│                          │                                    │
+│                    ┌─────▼─────┐                             │
+│                    │  Network  │                             │
+│                    └─────┬─────┘                             │
+│                          │                                    │
+└──────────────────────────┼────────────────────────────────────┘
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+   ┌──────▼──────┐  ┌──────▼──────┐  ┌────▼──────────┐
+   │  BACKEND    │  │ LocalStorage│  │  Printer      │
+   │  Django     │  │             │  │               │
+   │  Port 8000  │  │ • Token     │  │ • Windows     │
+   │             │  │ • Cache     │  │ • Print Dialog│
+   │ • Auth      │  │ • Offline   │  │ • PDF export  │
+   │ • Billing   │  │   data      │  │               │
+   │ • Products  │  │             │  │               │
+   │ • Reports   │  │             │  │               │
+   └─────────────┘  └─────────────┘  └───────────────┘
+```
+
+---
+
+## Development Flow
+
+```
+Developer's Machine:
+
+┌─────────────────────────────────────────────────────────┐
+│  npm run dev  (concurrently)                            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────┐   │
+│  │ Vite Dev     │  │ Electron    │  │ Backend    │   │
+│  │ Server       │  │             │  │ (manual)   │   │
+│  │              │  │             │  │            │   │
+│  │ :5173        │  │ Loads from  │  │ :8000      │   │
+│  │              │  │ :5173       │  │ (optional) │   │
+│  │ • HMR        │  │             │  │            │   │
+│  │ • React hot  │  │ • DevTools  │  │ • Django   │   │
+│  │   reload     │  │   auto-open │  │ • Data     │   │
+│  │ • Fast build │  │ • Debugging │  │   storage  │   │
+│  │              │  │   window    │  │            │   │
+│  └──────────────┘  └──────────────┘  └────────────┘   │
+│         │                  │               │           │
+│         └──────────┬───────┴───────┬──────┘           │
+│                    │               │                  │
+│              ┌─────▼───────────────▼─────┐           │
+│              │   User sees React App     │           │
+│              │   in Electron Window      │           │
+│              │                           │           │
+│              │ • Can edit code           │           │
+│              │ • App hot-reloads         │           │
+│              │ • Debug in DevTools       │           │
+│              │ • Test all features       │           │
+│              └───────────────────────────┘           │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+---
+
+## Production Build Flow
+
+```
+npm run dist (or npm run dist:portable)
+
+┌──────────────────────────────────────────────┐
+│  npm run build                               │
+│  (Build React to frontend/dist/)             │
+└────────────────────┬─────────────────────────┘
+                     │
+                     ▼
+         ┌─────────────────────┐
+         │ frontend/dist/      │
+         ├─────────────────────┤
+         │ index.html          │
+         │ assets/             │
+         │  ├─ app-xxx.js      │
+         │  ├─ react-vendor.js │
+         │  └─ style.css       │
+         └────────┬────────────┘
+                  │
+┌─────────────────┴──────────────────┐
+│  electron-builder -w               │
+│  (Create Windows installer)        │
+└────────────────────┬───────────────┘
+                     │
+         ┌───────────┴───────────┐
+         │                       │
+    ┌────▼──────┐         ┌──────▼─────┐
+    │ NSIS       │         │ Portable   │
+    │ Installer  │         │ Exe        │
+    │            │         │            │
+    │ Features:  │         │ Features:  │
+    │ • Wizard   │         │ • Extract  │
+    │ • Dir      │         │   and run  │
+    │   select   │         │ • No       │
+    │ • Desktop  │         │   install  │
+    │   shortcut │         │ • Copy&Run │
+    │ • Start    │         │            │
+    │   menu     │         │            │
+    └────────────┘         └────────────┘
+         │                       │
+         └───────────┬───────────┘
+                     │
+                     ▼
+         ┌─────────────────────┐
+         │  dist-electron/     │
+         │                     │
+         │ .exe installers     │
+         │ (Ready to share)    │
+         └─────────────────────┘
+```
+
+---
+
+## Data Flow in Application
+
+```
+┌─────────────────────────────────────────┐
+│      User Action (UI Event)             │
+│  e.g., "Create Invoice"                 │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+         ┌────────────────┐
+         │ React Handler  │
+         │ (useState/      │
+         │  setContext)   │
+         └────────┬───────┘
+                  │
+                  ▼
+         ┌────────────────┐
+         │ API Service    │
+         │                │
+         │ fetch() call   │
+         └────────┬───────┘
+                  │
+    ┌─────────────┴──────────────┐
+    │                            │
+    ▼ (if backend available)    ▼ (if offline)
+┌──────────────────┐         ┌───────────────┐
+│ POST to          │         │ localStorage  │
+│ http://localhost│         │               │
+│ :8000/api/      │         │ • Read cached │
+│                  │         │ • Use cached  │
+│ • Auth token     │         │   data        │
+│   sent           │         │ • Queue for   │
+│ • Data saved     │         │   sync        │
+│ • Response       │         └───────┬───────┘
+│   received       │                 │
+└────────┬─────────┘                 │
+         │                           │
+         └───────────┬───────────────┘
+                     │
+                     ▼
+         ┌────────────────────┐
+         │ Update State       │
+         │ (Context/useState) │
+         │                    │
+         │ • Show success msg │
+         │ • Update list view │
+         │ • Refresh data     │
+         └────────┬───────────┘
+                  │
+                  ▼
+         ┌────────────────────┐
+         │ React Re-render    │
+         │                    │
+         │ • New data visible │
+         │ • User sees result │
+         └────────────────────┘
+```
+
+---
+
+## Security Layers
+
+```
+┌──────────────────────────────────────────────────────┐
+│            SECURITY ARCHITECTURE                     │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  Layer 1: OPERATING SYSTEM                          │
+│  ├─ Process sandboxing                              │
+│  ├─ File system isolation                           │
+│  └─ Memory protection                               │
+│                                                      │
+│  Layer 2: ELECTRON                                  │
+│  ├─ contextIsolation: true                          │
+│  │  └─ Isolates main & renderer processes           │
+│  ├─ nodeIntegration: false                          │
+│  │  └─ No require() in renderer                     │
+│  └─ preload.js (contextBridge)                      │
+│     └─ Limited API exposure (platform, arch only)   │
+│                                                      │
+│  Layer 3: REACT APPLICATION                         │
+│  ├─ No direct file system access                    │
+│  ├─ No child process spawning                       │
+│  └─ No native module loading                        │
+│                                                      │
+│  Layer 4: API CALLS                                 │
+│  ├─ Standard HTTP with HTTPS support                │
+│  ├─ Authentication token (header)                   │
+│  ├─ Backend validates all requests                  │
+│  └─ CORS protection                                 │
+│                                                      │
+│  Layer 5: DATA STORAGE                              │
+│  ├─ localStorage (browser equivalent)               │
+│  ├─ No sensitive data persisted                     │
+│  ├─ Token encrypted on backend                      │
+│  └─ Tokens have expiration                          │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+## File Tree (Complete)
+
+```
+Inventory/
+│
+├── electron/                          ← NEW
+│   ├── main.js                        ← Main process
+│   └── preload.js                     ← Security
+│
+├── frontend/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Billing.jsx
+│   │   │   ├── Inventory.jsx
+│   │   │   ├── LoginPage.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   └── ...
+│   │   ├── components/
+│   │   │   ├── Common/
+│   │   │   ├── Billing/
+│   │   │   ├── Inventory/
+│   │   │   └── ...
+│   │   ├── context/
+│   │   │   ├── AuthContext.jsx
+│   │   │   ├── InvoiceContext.jsx
+│   │   │   ├── ProductContext.jsx
+│   │   │   ├── HSNContext.jsx
+│   │   │   └── ...
+│   │   ├── services/
+│   │   │   ├── api.js
+│   │   │   ├── hsnService.js
+│   │   │   └── ...
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── public/
+│   │   ├── vite.svg
+│   │   └── (icons)
+│   ├── dist/                          ← Built app (production)
+│   │   ├── index.html
+│   │   ├── assets/
+│   │   └── ...
+│   ├── package.json                   ← Updated version
+│   ├── vite.config.js                 ← Updated build config
+│   ├── index.html                     ← Updated title
+│   └── ...
+│
+├── backend/
+│   ├── manage.py
+│   ├── db.sqlite3
+│   ├── requirements.txt
+│   ├── config/
+│   ├── inventory/
+│   ├── authentication/
+│   └── ...
+│
+├── package.json                       ← NEW (root)
+├── .gitignore                         ← Updated
+│
+├── ELECTRON_SETUP_GUIDE.md            ← NEW
+├── ELECTRON_QUICK_START.md            ← NEW
+├── ELECTRON_IMPLEMENTATION_COMPLETE.md ← NEW
+├── ELECTRON_DEPLOYMENT_CHECKLIST.md   ← NEW
+├── setup-electron.sh                  ← NEW
+│
+└── dist-electron/                     ← Build output (after npm run dist)
+    ├── Choudhary Medical Store-1.0.0.exe
+    ├── Choudhary Medical Store-1.0.0-portable.exe
+    └── ...
+```
+
+---
+
+## State Management Flow
+
+```
+┌───────────────────────────────────────┐
+│    Authentication State               │
+├───────────────────────────────────────┤
+│ • Login/logout                        │
+│ • Token storage (localStorage)        │
+│ • User info (owner details)           │
+│ • Auto-login on app start             │
+└───────────┬───────────────────────────┘
+            │
+    ┌───────┴────────┐
+    │                │
+    ▼                ▼
+┌──────────────┐  ┌─────────────────┐
+│ Product      │  │ Invoice         │
+│ Context      │  │ Context         │
+├──────────────┤  ├─────────────────┤
+│ • Products   │  │ • Invoices      │
+│ • HSN codes  │  │ • Line items    │
+│ • Stock      │  │ • Calculations  │
+│ • Pricing    │  │ • Print data    │
+└──────────────┘  └─────────────────┘
+    │                    │
+    ├────────┬───────────┤
+    │        │           │
+    ▼        ▼           ▼
+┌──────────────────────────────────────┐
+│  Rendered UI (React Components)      │
+│                                      │
+│ • Billing Form                       │
+│ • Invoice List                       │
+│ • Product Search                     │
+│ • Settings                           │
+└──────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────┐
+│  Print / Save / Sync                 │
+│                                      │
+│ • window.print()                     │
+│ • localStorage.setItem()             │
+│ • fetch() to backend                 │
+└──────────────────────────────────────┘
+```
+
+---
+
+## Deployment Architecture
+
+```
+DEVELOPMENT                          PRODUCTION
+
+npm run dev                          npm run dist
+    │                                   │
+    ├── Vite server :5173           Builds React
+    ├── Electron window               Packages app
+    └── DevTools open                 Creates .exe
+                                          │
+User Machine (Dev)              Distribution (.exe)
+    │                                   │
+    └── Hot reload                  User Installation
+        All features                    │
+        Dev tools                   Windows Install
+                                        │
+                                    Desktop Shortcut
+                                    Start Menu Entry
+                                        │
+                                    Click icon
+                                        │
+                                    Electron loads
+                                    frontend/dist/
+                                        │
+                                    React App loads
+                                        │
+                                    Auto-login
+                                        │
+                                    Ready to use!
+```
+
+---
+
+This architecture ensures:
+✅ **Security**: Multiple isolation layers
+✅ **Performance**: Optimized builds, HMR in dev
+✅ **Reliability**: Offline support, error handling
+✅ **Maintainability**: Clear separation of concerns
+✅ **Scalability**: Easy to add features without breaking existing code
+

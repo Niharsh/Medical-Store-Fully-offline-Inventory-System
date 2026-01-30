@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import api from '../services/api'; // or wherever axios instance is
+import { useAuth } from './AuthContext';
 
 const WholesalersContext = createContext();
 
-const WHOLESALERS_STORAGE_KEY = 'inventory_wholesalers';
+
 const PURCHASE_HISTORY_STORAGE_KEY = 'inventory_purchase_history';
 
 export const WholesalersProvider = ({ children }) => {
@@ -10,33 +12,26 @@ export const WholesalersProvider = ({ children }) => {
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [selectedWholesalerId, setSelectedWholesalerId] = useState(null);
 
-  // Load from local storage on mount
-  useEffect(() => {
-    const savedWholesalers = localStorage.getItem(WHOLESALERS_STORAGE_KEY);
-    const savedHistory = localStorage.getItem(PURCHASE_HISTORY_STORAGE_KEY);
-    
-    if (savedWholesalers) {
-      try {
-        setWholesalers(JSON.parse(savedWholesalers));
-      } catch (err) {
-        console.error('Failed to load wholesalers from storage:', err);
-      }
-    }
-    
-    if (savedHistory) {
-      try {
-        setPurchaseHistory(JSON.parse(savedHistory));
-      } catch (err) {
-        console.error('Failed to load purchase history from storage:', err);
-      }
-    }
-  }, []);
+  // ✅ FIXED: Check auth state before fetching
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
-  // Save wholesalers to local storage
-  const saveWholesalers = (data) => {
-    localStorage.setItem(WHOLESALERS_STORAGE_KEY, JSON.stringify(data));
-    setWholesalers(data);
-  };
+  // ✅ FIXED: Only fetch when authenticated and auth is not loading
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+    
+    api.get('/wholesalers/')
+      .then(res => {
+        setWholesalers(res.data.results ?? res.data);
+      })
+      .catch(err => {
+        console.error('Failed to load wholesalers', err);
+        // Don't crash if 401 - auth guard will redirect
+      });
+  }, [isAuthenticated, authLoading]);
+  
+  
 
   // Save purchase history to local storage
   const savePurchaseHistory = (data) => {
@@ -45,23 +40,24 @@ export const WholesalersProvider = ({ children }) => {
   };
 
   // Add new wholesaler
-  const addWholesaler = (name, contactNumber = '') => {
-    const newWholesaler = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      contactNumber: contactNumber.trim(),
-      createdAt: new Date().toISOString()
-    };
-    const updated = [...wholesalers, newWholesaler];
-    saveWholesalers(updated);
-    return newWholesaler;
-  };
+  const addWholesaler = async ({ name, phone, gstNumber }) => {
+          const payload = {
+            name: name.trim(),
+            contact_number: phone?.trim() || '',
+            gst_number: gstNumber?.trim() || '',
+          };
+        
+          const res = await api.post('/wholesalers/', payload);
+          setWholesalers(prev => [...prev, res.data]);
+          return res.data;
+        };  
+
 
   // Update wholesaler
-  const updateWholesaler = (id, name, contactNumber = '') => {
+  const updateWholesaler = (id, name, contactNumber = '', gstNumber = '') => {
     const updated = wholesalers.map(w => 
       w.id === id 
-        ? { ...w, name: name.trim(), contactNumber: contactNumber.trim() }
+        ? { ...w, name: name.trim(), contactNumber: contactNumber.trim(), gstNumber: gstNumber.trim() }
         : w
     );
     saveWholesalers(updated);
@@ -124,22 +120,32 @@ export const WholesalersProvider = ({ children }) => {
     return selectedWholesalerId ? getWholesaler(selectedWholesalerId) : null;
   };
 
+  // Log whenever context value changes
+  console.log('🔄 WholesalersContext provider rendering with:', {
+    wholesalesCount: wholesalers.length,
+    wholesalers: wholesalers.map(w => ({ id: w.id, name: w.name })),
+    selectedWholesalerId
+  });
+
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    wholesalers,
+    purchaseHistory,
+    selectedWholesalerId,
+    setSelectedWholesalerId,
+    addWholesaler,
+    updateWholesaler,
+    deleteWholesaler,
+    recordPurchase,
+    getLastPurchasePrice,
+    getProductPurchaseHistory,
+    getWholesalerPurchaseHistory,
+    getWholesaler,
+    getSelectedWholesaler
+  }), [wholesalers, purchaseHistory, selectedWholesalerId]);
+
   return (
-    <WholesalersContext.Provider value={{
-      wholesalers,
-      purchaseHistory,
-      selectedWholesalerId,
-      setSelectedWholesalerId,
-      addWholesaler,
-      updateWholesaler,
-      deleteWholesaler,
-      recordPurchase,
-      getLastPurchasePrice,
-      getProductPurchaseHistory,
-      getWholesalerPurchaseHistory,
-      getWholesaler,
-      getSelectedWholesaler
-    }}>
+    <WholesalersContext.Provider value={contextValue}>
       {children}
     </WholesalersContext.Provider>
   );

@@ -18,6 +18,13 @@ backend/.env
 backend/.env.local
 backend//.vscode/
 
+# Electron
+node_modules/
+dist-electron/
+*.exe
+*.msi
+*.zip
+
 # IDE
 .vscode/
 .idea/

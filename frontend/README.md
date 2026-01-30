@@ -104,6 +104,24 @@ frontend/
    ```
    The app will open at `http://localhost:5173/`
 
+---
+
+## Admin Recovery (Offline) acceptance test
+
+An automated Playwright-based acceptance test exercises the full offline Admin recovery flow (verify code → set new password locally → login with new password).
+
+- Install dev dependencies (once):
+  - `cd frontend && npm install`
+- Start the frontend dev server in one terminal:
+  - `cd frontend && npm run dev`
+- Run the acceptance test in another terminal:
+  - `cd frontend && npm run test:admin-recovery`
+
+Notes:
+- The test sets a temporary admin code in `localStorage`, performs the flow, and exits with status 0 on success.
+- Playwright will download browser binaries on first install; allow network access for initial installation.
+
+
 5. **Build for production**:
    ```bash
    npm run build

@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useInvoices } from '../../context/InvoiceContext';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ErrorAlert from '../Common/ErrorAlert';
 
 const InvoiceHistory = ({ onViewDetails }) => {
   const { invoices, loading, error, fetchInvoices } = useInvoices();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchInvoices();
@@ -53,7 +55,7 @@ const InvoiceHistory = ({ onViewDetails }) => {
                   </td>
                   <td className="py-4 text-center">
                     <button
-                      onClick={() => onViewDetails?.(invoice)}
+                      onClick={() => navigate(`/billing/invoices/${invoice.id}`)}
                       className="btn-secondary text-sm px-3 py-1"
                     >
                       View

@@ -1,5 +1,10 @@
 from django.db import models
 from decimal import Decimal
+from django.db.models import F, Sum
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from decimal import Decimal
 
 
 class ProductType(models.Model):
@@ -17,6 +22,11 @@ class ProductType(models.Model):
     label = models.CharField(
         max_length=100,
         help_text="Display label. E.g., 'Tablet', 'Gel', 'Spray'"
+    )
+    hsn_code = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="HSN code for this product type"
     )
     is_default = models.BooleanField(
         default=False,
@@ -46,6 +56,43 @@ class ProductType(models.Model):
             cls.objects.get_or_create(name=name, defaults={'label': label, 'is_default': True})
 
 
+class HSN(models.Model):
+    """HSN (Harmonized System Nomenclature) Codes for GST classification"""
+    
+    hsn_code = models.CharField(
+        max_length=20,
+        unique=True,
+        primary_key=True,
+        help_text="Unique HSN code (e.g., 3004, 3003)"
+    )
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Description of HSN code (e.g., 'Medicaments - Antibiotics')"
+    )
+    gst_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="GST rate (%) for this HSN code (e.g., 5, 12, 18)"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this HSN code is active for use"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['hsn_code']
+        indexes = [
+            models.Index(fields=['hsn_code']),
+            models.Index(fields=['gst_rate']),
+        ]
+    
+    def __str__(self):
+        return f"{self.hsn_code} - {self.gst_rate}% GST"
+
+
 class Product(models.Model):
     """Product in medical store inventory (tablets, syrups, powders, creams, etc.)"""
     
@@ -53,6 +100,14 @@ class Product(models.Model):
     product_type = models.CharField(
         max_length=50,
         help_text="Type of product (references ProductType.name). Can be default or custom type."
+    )
+    hsn = models.ForeignKey(
+        HSN,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='products',
+        help_text="HSN code for this product (used for GST classification)"
     )
     generic_name = models.CharField(max_length=255, blank=True)
     manufacturer = models.CharField(max_length=255, blank=True)
@@ -67,6 +122,10 @@ class Product(models.Model):
         help_text="Active salt/composition (optional, mainly for tablets/capsules). E.g., 'Paracetamol 500mg'"
     )
     description = models.TextField(blank=True)
+    min_stock_level = models.PositiveIntegerField(
+        default=10,
+        help_text="Minimum stock level for this product. Alert triggered when total quantity falls below this. Default is 10 units."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -84,6 +143,7 @@ class Product(models.Model):
 class Batch(models.Model):
     """Batch/Lot number for tracking inventory, pricing, and expiry per batch"""
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='batches')
+    wholesaler = models.ForeignKey('Wholesaler', on_delete=models.SET_NULL, null=True, blank=True, related_name='batches')
     batch_number = models.CharField(
         max_length=100,
         help_text="Manufacturer batch number (e.g., LOT-2024-001)"
@@ -123,46 +183,70 @@ class Batch(models.Model):
     def __str__(self):
         return f"{self.batch_number} - {self.product.name}"
 
+class Wholesaler(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    contact_number = models.CharField(max_length=20, blank=True)
+    gst_number = models.CharField(max_length=20, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['gst_number']),
+        ]
+
+    def __str__(self):
+        return self.name
 
 class Invoice(models.Model):
-    """Bill/Invoice for selling medicines"""
     customer_name = models.CharField(max_length=255)
     customer_phone = models.CharField(max_length=20, blank=True)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
+    customer_dl_number = models.CharField(max_length=100, blank=True, null=True, help_text="Customer Drug License Number")
+
+    gst_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        help_text="GST applied to entire invoice"
+    )
+
+    discount_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        help_text="Discount applied to entire invoice"
+    )
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['-created_at']),
-        ]
+    
+    def calculate_totals(self):
+        subtotal = sum(item.get_subtotal() for item in self.items.all())
+    
+        discount_amount = subtotal * (self.discount_percent / 100)
+        taxable_amount = subtotal - discount_amount
+    
+        gst_amount = taxable_amount * (self.gst_percent / 100)
+    
+        self.total_amount = taxable_amount + gst_amount
+        self.save(update_fields=['total_amount'])
 
-    def __str__(self):
-        return f"Invoice #{self.id} - {self.customer_name}"
-
-    def save(self, *args, **kwargs):
-        """Calculate total_amount before saving"""
-        self.total_amount = self.calculate_total()
-        super().save(*args, **kwargs)
-
-    def calculate_total(self):
-        """Calculate total from all invoice items using SELLING RATE ONLY"""
-        total = Decimal('0.00')
-        for item in self.items.all():
-            total += item.get_subtotal()
-        return total
 
 
 class InvoiceItem(models.Model):
     """Individual item in an invoice, linked to specific batch"""
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    batch_number = models.CharField(
-        max_length=100,
-        help_text="Batch number for traceability"
-    )
+    product_name = models.CharField(max_length=255)
+    batch_number = models.CharField(max_length=100)
+
+    expiry_date = models.DateField(null=True, blank=True)
+    hsn_code = models.CharField(max_length=50, blank=True)
+
     quantity = models.PositiveIntegerField(
         help_text="Quantity sold from this batch"
     )
@@ -181,8 +265,31 @@ class InvoiceItem(models.Model):
         decimal_places=2,
         help_text="MRP for reference/display only (not used in calculations)"
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    discount_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        help_text="Discount percentage applied to this item"
+    )
+    gst_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        help_text="GST percentage applicable to this item"
+    )
+    
+    # Return fields
+    is_return = models.BooleanField(
+        default=False,
+        help_text="Mark this item as a return (inventory will be increased)"
+    )
+    return_reason = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Reason for return (e.g., Defective, Expired, Customer Request)"
+    )
 
+    created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         ordering = ['invoice', '-created_at']
         indexes = [
@@ -190,11 +297,29 @@ class InvoiceItem(models.Model):
         ]
 
     def __str__(self):
-        return f"InvoiceItem #{self.id} - {self.product.name} x{self.quantity}"
+        return f"{self.product_name} | Batch {self.batch_number} x{self.quantity}"
 
     def get_subtotal(self):
         """Calculate subtotal using SELLING RATE ONLY (NOT mrp)"""
         return Decimal(str(self.quantity)) * self.selling_rate
+    
+    def get_taxable_amount(self):
+        amount = Decimal(self.quantity) * self.selling_rate
+        discount = (amount * self.discount_percent) / Decimal('100')
+        return amount - discount
+
+    def get_gst_amount(self):
+        return (self.get_taxable_amount() * self.gst_percent) / Decimal('100')
+
+    def get_cgst(self):
+        return self.get_gst_amount() / Decimal('2')
+
+    def get_sgst(self):
+        return self.get_gst_amount() / Decimal('2')
+
+    def get_total_amount(self):
+        return self.get_taxable_amount() + self.get_gst_amount()
+
 
 
 class SalesBill(models.Model):
@@ -223,7 +348,15 @@ class SalesBill(models.Model):
 
     def save(self, *args, **kwargs):
         """Calculate amount_due and update payment_status"""
-        self.amount_due = self.total_amount - self.amount_paid
+        # ✅ STRICT RULE: amount_due = NaN only when amount_paid === 0
+        # When no payment received yet, amount due is undefined/infinite
+        # When payment started, calculate exact amount due
+        if self.amount_paid == 0:
+            # Use Decimal('NaN') to mark "amount due undefined when no payment received"
+            # Serializer will convert this to null for JSON safety
+            self.amount_due = Decimal('NaN')
+        else:
+            self.amount_due = self.total_amount - self.amount_paid
         
         # Update payment status based on amounts
         if self.amount_paid >= self.total_amount:
@@ -244,7 +377,18 @@ class PurchaseBill(models.Model):
         ('paid', 'Paid'),
     ]
     
-    wholesaler = models.CharField(max_length=255)
+    bill_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Purchase bill number (assigned by user or system)"
+    )
+    purchase_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Date of purchase"
+    )
+    wholesaler = models.ForeignKey('Wholesaler', on_delete=models.CASCADE, related_name='purchase_bills')
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     amount_due = models.DecimalField(max_digits=10, decimal_places=2)
@@ -262,7 +406,15 @@ class PurchaseBill(models.Model):
 
     def save(self, *args, **kwargs):
         """Calculate amount_due and update payment_status"""
-        self.amount_due = self.total_amount - self.amount_paid
+        # ✅ STRICT RULE: amount_due = NaN only when amount_paid === 0
+        # When no payment received yet, amount due is undefined/infinite
+        # When payment started, calculate exact amount due
+        if self.amount_paid == 0:
+            # Use Decimal('NaN') to mark "amount due undefined when no payment received"
+            # Serializer will convert this to null for JSON safety
+            self.amount_due = Decimal('NaN')
+        else:
+            self.amount_due = self.total_amount - self.amount_paid
         
         # Update payment status based on amounts
         if self.amount_paid >= self.total_amount:
@@ -273,3 +425,32 @@ class PurchaseBill(models.Model):
             self.payment_status = 'unpaid'
         
         super().save(*args, **kwargs)
+
+
+    
+class StoreSettings(models.Model):
+    store_name = models.CharField(max_length=255)
+    gst_number = models.CharField(max_length=20, blank=True)
+    address = models.TextField(blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return "Store Settings"
+    
+    def save(self, *args, **kwargs):
+        self.pk = 1  # force single row
+        super().save(*args, **kwargs)
+
+
+class ShopProfile(models.Model):
+    shop_name = models.CharField(max_length=200)
+    owner_name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=20)
+    email = models.EmailField(blank=True, null=True)
+    address = models.TextField()
+    gst_number = models.CharField(max_length=50, blank=True, null=True)
+    dl_number = models.CharField(max_length=100, blank=True, null=True, help_text="Drug License Number")
+
+    def __str__(self):
+        return self.shop_name

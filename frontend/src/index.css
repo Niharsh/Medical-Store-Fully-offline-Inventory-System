@@ -1,54 +1,163 @@
 @import "tailwindcss";
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ===============================
+   BASE STYLES
+   =============================== */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+  }
 }
 
-body {
-  @apply bg-gray-50 text-gray-900 font-sans;
-}
-
+/* ===============================
+   COMPONENTS
+   =============================== */
 @layer components {
+  /* ===== BUTTONS ===== */
   .btn-primary {
-    @apply bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors;
+    @apply bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors font-medium;
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors;
+    @apply bg-gray-200 text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium;
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors;
+    @apply bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium;
   }
 
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  /* ===== CARDS ===== */
   .card {
     @apply bg-white rounded-lg shadow-md p-6;
   }
 
+  .card-compact {
+    @apply bg-white rounded-lg shadow-sm p-4;
+  }
+
+  .card-elevated {
+    @apply bg-white rounded-lg shadow-lg p-6;
+  }
+
+  /* ===== STAT CARDS ===== */
+  .stat-card {
+    @apply bg-white rounded-lg shadow-md p-6 border-l-4 transition-all hover:shadow-lg;
+  }
+
+  .stat-card-primary {
+    @apply bg-sky-50 border-sky-600;
+  }
+
+  .stat-card-success {
+    @apply bg-green-50 border-green-600;
+  }
+
+  .stat-card-warning {
+    @apply bg-amber-50 border-amber-600;
+  }
+
+  .stat-card-danger {
+    @apply bg-red-50 border-red-600;
+  }
+
+  .stat-card-value {
+    @apply text-4xl font-bold mt-2;
+  }
+
+  .stat-card-label {
+    @apply text-gray-600 text-sm font-medium;
+  }
+
+  /* ===== FORM ELEMENTS ===== */
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500;
+    @apply w-full px-3 py-2.5 border border-gray-300 rounded-lg
+           focus:outline-none focus:ring-2 focus:ring-sky-500
+           focus:border-transparent transition-all;
+  }
+
+  .input-field:disabled {
+    @apply bg-gray-100 cursor-not-allowed;
+  }
+
+  .form-group {
+    @apply space-y-2;
+  }
+
+  .form-label {
+    @apply block text-sm font-semibold text-gray-700;
+  }
+
+  /* ===== HEADERS ===== */
+  .section-header {
+    @apply text-2xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200;
+  }
+
+  .section-subheader {
+    @apply text-lg font-semibold text-gray-800 mb-4;
+  }
+
+  /* ===== ALERTS ===== */
+  .alert {
+    @apply rounded-lg p-4 mb-4;
+  }
+
+  .alert-info {
+    @apply bg-sky-50 border-l-4 border-sky-600 text-sky-800;
+  }
+
+  .alert-success {
+    @apply bg-green-50 border-l-4 border-green-600 text-green-800;
+  }
+
+  .alert-warning {
+    @apply bg-amber-50 border-l-4 border-amber-600 text-amber-800;
+  }
+
+  .alert-danger {
+    @apply bg-red-50 border-l-4 border-red-600 text-red-800;
+  }
+
+  /* ===== TABLES ===== */
+  .table-header {
+    @apply bg-gray-100 font-semibold text-gray-900;
+  }
+
+  .table-body {
+    @apply px-4 py-4 text-sm text-gray-700;
   }
 
   .table-row {
     @apply border-b border-gray-200 hover:bg-gray-50 transition-colors;
   }
+
+  .table-row.expanded {
+    @apply bg-gray-50;
+  }
 }
+
+/* ===============================
+   BROWSER / ACCESSIBILITY
+   =============================== */
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+/* =========================
+   PRINT FIX – HIDE LAYOUT
+   ========================= */
+@media print {
+  .print-hidden {
+    display: none !important;
   }
 }
+

@@ -3,7 +3,7 @@ import { useProducts } from '../context/ProductContext';
 import { useInvoices } from '../context/InvoiceContext';
 import { useSalesBills } from '../context/SalesBillsContext';
 import { usePurchaseBills } from '../context/PurchaseBillsContext';
-import SalesTable from '../components/SalesAndPurchases/SalesTable';
+import api from '../services/api';
 import PurchasesTable from '../components/SalesAndPurchases/PurchasesTable';
 import PurchasesForm from '../components/SalesAndPurchases/PurchasesForm';
 
@@ -12,7 +12,7 @@ import PurchasesForm from '../components/SalesAndPurchases/PurchasesForm';
  * 
  * Displays:
  * - Total products (all types: tablets, syrups, powders, creams, diapers, condoms, sachets)
- * - Low stock count (threshold determined by backend)
+ * - Low stock items (fetched from backend with product-specific thresholds)
  * - Expiry overview with filtering (6/3/1 month)
  * - Sales & Purchases Overview with paid/due tracking
  * 
@@ -25,45 +25,72 @@ const Dashboard = () => {
   const { summary: purchaseSummary, fetchSummary: fetchPurchasesSummary } = usePurchaseBills();
   const [stats, setStats] = useState({
     totalProducts: 0,
-    lowStockCount: 0,
     recentInvoices: 0,
   });
+  // Low stock state - fetched from API
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [lowStockLoading, setLowStockLoading] = useState(false);
+  const [lowStockError, setLowStockError] = useState('');
+  
   const [selectedExpiryRange, setSelectedExpiryRange] = useState(null);
-  const [expiringProducts, setExpiringProducts] = useState([]);
+  const [expiringBatches, setExpiringBatches] = useState([]);
+  const [expiryLoading, setExpiryLoading] = useState(false);
+  const [expiryError, setExpiryError] = useState('');
   const [salesPurchasesPeriod, setSalesPurchasesPeriod] = useState('month');
+
+  // Fetch low stock items from API
+  const fetchLowStockItems = async () => {
+    setLowStockLoading(true);
+    setLowStockError('');
+    try {
+      const response = await api.get('/products/low_stock/');
+      console.log('✅ Low stock items fetched:', response.data);
+      setLowStockItems(response.data.low_stock_items || []);
+      setLowStockCount(response.data.count || 0);
+    } catch (error) {
+      console.error('❌ Error fetching low stock items:', error);
+      setLowStockError('Failed to fetch low stock information');
+      setLowStockItems([]);
+      setLowStockCount(0);
+    } finally {
+      setLowStockLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchProducts();
     fetchInvoices();
+    fetchLowStockItems();
     fetchSalesSummary(salesPurchasesPeriod);
     fetchPurchasesSummary(salesPurchasesPeriod);
   }, [salesPurchasesPeriod]);
 
-  // Calculate expiring products
-  const getExpiringProducts = (monthsRange) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const endDate = new Date(today);
-    endDate.setMonth(endDate.getMonth() + monthsRange);
-    endDate.setHours(23, 59, 59, 999);
-
-    return products.filter(product => {
-      if (!product.expiry_date) return false;
-      const expiryDate = new Date(product.expiry_date);
-      expiryDate.setHours(0, 0, 0, 0);
-      return expiryDate >= today && expiryDate <= endDate;
-    });
+  // Fetch expiring batches from API
+  const fetchExpiringBatches = async (months) => {
+    setExpiryLoading(true);
+    setExpiryError('');
+    try {
+      const response = await api.get(`/batches/expiring/?months=${months}`);
+      console.log('✅ Expiring batches fetched:', response.data);
+      setExpiringBatches(response.data.batches || []);
+    } catch (error) {
+      console.error('❌ Error fetching expiring batches:', error);
+      setExpiryError('Failed to fetch expiring products');
+      setExpiringBatches([]);
+    } finally {
+      setExpiryLoading(false);
+    }
   };
 
   // Handle expiry filter click
   const handleExpiryFilter = (months) => {
     if (selectedExpiryRange === months) {
       setSelectedExpiryRange(null);
-      setExpiringProducts([]);
+      setExpiringBatches([]);
     } else {
       setSelectedExpiryRange(months);
-      setExpiringProducts(getExpiringProducts(months));
+      fetchExpiringBatches(months);
     }
   };
 
@@ -92,12 +119,9 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // Display data from API - backend determines low stock threshold
-    const lowStockCount = products.filter(p => p.quantity < 10).length;
-
+    // Update stats from fetched data
     setStats({
       totalProducts: products.length,
-      lowStockCount: lowStockCount,
       recentInvoices: invoices.length,
     });
   }, [products, invoices]);
@@ -109,6 +133,22 @@ const Dashboard = () => {
     </div>
   );
 
+  // Get severity color for low stock
+  const getSeverityColor = (severity) => {
+    if (severity === 'critical') {
+      return 'bg-red-100 border-red-300 text-red-900';
+    }
+    return 'bg-yellow-100 border-yellow-300 text-yellow-900';
+  };
+
+  // Get severity badge
+  const getSeverityBadge = (severity) => {
+    if (severity === 'critical') {
+      return <span className="inline-block px-2 py-1 text-xs font-bold bg-red-600 text-white rounded">CRITICAL</span>;
+    }
+    return <span className="inline-block px-2 py-1 text-xs font-bold bg-yellow-600 text-white rounded">WARNING</span>;
+  };
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -119,7 +159,7 @@ const Dashboard = () => {
         />
         <StatCard 
           title="Low Stock Items" 
-          value={stats.lowStockCount}
+          value={lowStockCount}
           color="amber"
         />
         <StatCard 
@@ -129,16 +169,71 @@ const Dashboard = () => {
         />
       </div>
 
-      {stats.lowStockCount > 0 && (
-        <div className="card bg-amber-50 border-l-4 border-amber-600">
-          <h3 className="text-lg font-semibold text-amber-900 mb-2">
-            ⚠️ Low Stock Alert
-          </h3>
-          <p className="text-amber-800">
-            {stats.lowStockCount} medicine(s) have quantity below 10 units.
+      {/* Low Stock Alert Section */}
+      {lowStockCount > 0 && (
+        <div className="card">
+          <h2 className="text-2xl font-bold mb-4">⚠️ Low Stock Alert</h2>
+          <p className="text-gray-600 mb-4">
+            {lowStockCount} medicine{lowStockCount !== 1 ? 's have' : ' has'} fallen below minimum stock level. Please reorder immediately.
           </p>
-          <p className="text-amber-700 text-sm mt-2">
-            Note: Backend determines what qualifies as "low stock". Update the threshold there if needed.
+          
+          {lowStockError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded mb-4">
+              {lowStockError}
+            </div>
+          )}
+
+          {lowStockLoading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Loading low stock information...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="text-left px-4 py-2">Medicine Name</th>
+                    <th className="text-left px-4 py-2">Type</th>
+                    <th className="text-center px-4 py-2">Current Stock</th>
+                    <th className="text-center px-4 py-2">Minimum Required</th>
+                    <th className="text-center px-4 py-2">Units Below</th>
+                    <th className="text-center px-4 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lowStockItems.map((item) => (
+                    <tr key={item.product_id} className={`border-b ${getSeverityColor(item.severity)}`}>
+                      <td className="px-4 py-3 font-semibold">{item.product_name}</td>
+                      <td className="px-4 py-3">{item.product_type}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold">{item.current_stock}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold">{item.min_stock_level}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold text-red-600">-{item.units_below}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {getSeverityBadge(item.severity)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* No low stock items message */}
+      {lowStockCount === 0 && !lowStockLoading && (
+        <div className="card bg-green-50 border-l-4 border-green-600">
+          <h3 className="text-lg font-semibold text-green-900 mb-2">
+            ✅ All Stock Levels Normal
+          </h3>
+          <p className="text-green-800">
+            All medicines are currently above their minimum stock levels. No reordering needed at this time.
           </p>
         </div>
       )}
@@ -146,7 +241,7 @@ const Dashboard = () => {
       {/* Expiry Overview Section */}
       <div className="card">
         <h2 className="text-2xl font-bold mb-6">📅 Expiry Overview</h2>
-        <p className="text-gray-600 mb-4">Click on a timeframe to see products expiring within that period:</p>
+        <p className="text-gray-600 mb-4">Click on a timeframe to see batches expiring within that period:</p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <button
@@ -181,17 +276,25 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Expiring Products List */}
+        {/* Expiring Batches List */}
         {selectedExpiryRange && (
           <div>
             <h3 className="font-semibold mb-4 text-lg">
-              Products expiring in {selectedExpiryRange} month{selectedExpiryRange > 1 ? 's' : ''}:
-              <span className="ml-2 text-2xl font-bold text-blue-600">{expiringProducts.length}</span>
+              Batches expiring in {selectedExpiryRange} month{selectedExpiryRange > 1 ? 's' : ''}:
+              <span className="ml-2 text-2xl font-bold text-blue-600">{expiringBatches.length}</span>
             </h3>
 
-            {expiringProducts.length === 0 ? (
+            {expiryError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded mb-4">
+                {expiryError}
+              </div>
+            )}
+
+            {expiryLoading ? (
+              <p className="text-gray-600 text-center py-8">Loading expiring batches...</p>
+            ) : expiringBatches.length === 0 ? (
               <p className="text-gray-600 text-center py-8">
-                No products expiring in this timeframe. Great!
+                No batches expiring in this timeframe. Great!
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -200,22 +303,24 @@ const Dashboard = () => {
                     <tr className="border-b-2 border-gray-300">
                       <th className="text-left py-3">Product Name</th>
                       <th className="text-left py-3">Type</th>
+                      <th className="text-center py-3">Batch No</th>
                       <th className="text-center py-3">Quantity</th>
                       <th className="text-center py-3">Expiry Date</th>
                       <th className="text-center py-3">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {expiringProducts.map(product => {
-                      const expiryStatus = getExpiryStatus(product.expiry_date);
+                    {expiringBatches.map(batch => {
+                      const expiryStatus = getExpiryStatus(batch.expiry_date);
                       return (
-                        <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 font-semibold">{product.name}</td>
+                        <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 font-semibold">{batch.product_name}</td>
                           <td className="py-3 text-gray-600 text-sm">
-                            {product.product_type.charAt(0).toUpperCase() + product.product_type.slice(1)}
+                            {batch.product_type.charAt(0).toUpperCase() + batch.product_type.slice(1)}
                           </td>
-                          <td className="py-3 text-center">{product.quantity}</td>
-                          <td className="py-3 text-center">{formatDate(product.expiry_date)}</td>
+                          <td className="py-3 text-center text-sm">{batch.batch_number}</td>
+                          <td className="py-3 text-center">{batch.quantity}</td>
+                          <td className="py-3 text-center">{formatDate(batch.expiry_date)}</td>
                           <td className="py-3 text-center">
                             <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${expiryStatus.color}`}>
                               {expiryStatus.text}
@@ -260,117 +365,64 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-600">
-            <p className="text-gray-600 text-sm mb-1">Total Sales</p>
-            <p className="text-3xl font-bold text-green-600">₹{parseFloat(salesSummary.total_sales || 0).toFixed(2)}</p>
-            <p className="text-xs text-gray-500 mt-2">{salesSummary.bill_count || 0} bills</p>
-          </div>
-
-          <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-            <p className="text-gray-600 text-sm mb-1">Total Amount Paid</p>
-            <p className="text-3xl font-bold text-blue-600">₹{parseFloat(salesSummary.total_paid || 0).toFixed(2)}</p>
-            <p className="text-xs text-gray-500 mt-2">From sales</p>
-          </div>
-
-          <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-600">
-            <p className="text-gray-600 text-sm mb-1">Total Amount Due</p>
-            <p className="text-3xl font-bold text-orange-600">₹{parseFloat(salesSummary.total_due || 0).toFixed(2)}</p>
-            <p className="text-xs text-gray-500 mt-2">From customers</p>
-          </div>
-
-          <div className="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-600">
-            <p className="text-gray-600 text-sm mb-1">Total Purchases</p>
-            <p className="text-3xl font-bold text-purple-600">₹{parseFloat(purchaseSummary.total_purchases || 0).toFixed(2)}</p>
-            <p className="text-xs text-gray-500 mt-2">{purchaseSummary.bill_count || 0} bills</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-indigo-50 p-4 rounded-lg">
-            <p className="text-gray-600 text-sm mb-1">Purchase Amount Paid</p>
-            <p className="text-2xl font-bold text-indigo-600">₹{parseFloat(purchaseSummary.total_paid || 0).toFixed(2)}</p>
-          </div>
-
-          <div className="bg-red-50 p-4 rounded-lg">
-            <p className="text-gray-600 text-sm mb-1">Amount Due to Wholesalers</p>
-            <p className="text-2xl font-bold text-red-600">₹{parseFloat(purchaseSummary.total_due || 0).toFixed(2)}</p>
-          </div>
-        </div>
-
-        {/* Tabs for Sales and Purchases */}
-        <div className="mt-8">
-          <div className="mb-4 border-b-2 border-gray-300">
-            <div className="flex gap-4">
-              <input
-                type="radio"
-                id="sales-tab"
-                name="section"
-                value="sales"
-                defaultChecked
-                className="hidden"
-              />
-              <label htmlFor="sales-tab" className="cursor-pointer pb-2 px-4 font-semibold border-b-4 border-blue-600 text-blue-600">
-                📈 Sales Bills
-              </label>
-              
-              <input
-                type="radio"
-                id="purchases-tab"
-                name="section"
-                value="purchases"
-                className="hidden"
-              />
-              <label htmlFor="purchases-tab" className="cursor-pointer pb-2 px-4 font-semibold text-gray-600 hover:text-blue-600">
-                📦 Purchase Bills
-              </label>
+        {/* 4-Card Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm mb-2">Total Sales</p>
+                <p className="text-4xl font-bold text-green-600">₹{parseFloat(salesSummary.total_sales || 0).toFixed(2)}</p>
+              </div>
+              <div className="text-5xl opacity-20">💳</div>
             </div>
+          </div>
+
+          <div className="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm mb-2">Total Purchases</p>
+                <p className="text-4xl font-bold text-blue-600">₹{parseFloat(purchaseSummary.total_purchases || 0).toFixed(2)}</p>
+              </div>
+              <div className="text-5xl opacity-20">📦</div>
+            </div>
+          </div>
+
+          <div className="bg-emerald-50 border-l-4 border-emerald-600 p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm mb-2">Total Amount Paid</p>
+                <p className="text-4xl font-bold text-emerald-600">₹{(parseFloat(salesSummary.total_paid || 0) + parseFloat(purchaseSummary.total_paid || 0)).toFixed(2)}</p>
+              </div>
+              <div className="text-5xl opacity-20">💰</div>
+            </div>
+          </div>
+
+          <div className="bg-orange-50 border-l-4 border-orange-600 p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm mb-2">Total Amount Due</p>
+                <p className="text-4xl font-bold text-orange-600">₹{(parseFloat(salesSummary.total_due || 0) + parseFloat(purchaseSummary.total_due || 0)).toFixed(2)}</p>
+              </div>
+              <div className="text-5xl opacity-20">📋</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Purchase Management Section */}
+        <div className="space-y-8">
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Purchase Management</h3>
+            <PurchasesForm onSuccess={() => {}} />
           </div>
 
           <div>
-            <label htmlFor="sales-tab" className="hidden">Sales Bills</label>
-            <div id="sales-content" className="tab-content">
-              <SalesTable period={salesPurchasesPeriod} />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="purchases-tab" className="hidden">Purchase Bills</label>
-            <div id="purchases-content" className="mt-8 space-y-8">
-              <PurchasesForm onSuccess={() => {}} />
-              <PurchasesTable period={salesPurchasesPeriod} />
-            </div>
+            <h3 className="text-xl font-semibold mb-4">Purchase Bills</h3>
+            <PurchasesTable period={salesPurchasesPeriod} />
           </div>
         </div>
       </div>
 
-      <div className="card">
-        <h2 className="text-2xl font-bold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <a href="/inventory" className="btn-primary text-center block">
-            📦 Manage Inventory
-          </a>
-          <a href="/billing" className="btn-primary text-center block">
-            💳 Create Invoice
-          </a>
-        </div>
-      </div>
 
-      <div className="card">
-        <h2 className="text-2xl font-bold mb-4">API Status</h2>
-        <div className="bg-gray-50 p-4 rounded text-sm text-gray-700 space-y-2">
-          <p><strong>API Base URL:</strong> {import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}</p>
-          <p><strong>Frontend Status:</strong> Ready to integrate with Django backend</p>
-          <p><strong>Data Source:</strong> All data comes from the API backend</p>
-          <p className="text-xs text-gray-600 mt-3">
-            ✓ No mock data<br/>
-            ✓ No frontend calculations<br/>
-            ✓ Backend handles all business logic<br/>
-            ✓ See API_CONTRACTS.md for detailed specifications
-          </p>
-        </div>
-      </div>
     </div>
   );
 };

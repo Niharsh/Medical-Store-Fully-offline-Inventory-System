@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useWholesalers } from '../../context/WholesalersContext';
 
-const WholesalersManager = () => {
+const WholesalersManager = ({ disabled = false }) => {
   const { wholesalers, selectedWholesalerId, setSelectedWholesalerId, addWholesaler, updateWholesaler, deleteWholesaler } = useWholesalers();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ name: '', contactNumber: '' });
+  const [formData, setFormData] = useState({ name: '', contactNumber: '', gstNumber: '' });
   const [message, setMessage] = useState('');
 
   const handleFormChange = (e) => {
@@ -13,23 +13,43 @@ const WholesalersManager = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       setMessage('Wholesaler name is required');
       return;
     }
 
+    const normalizedName = formData.name.trim().toLowerCase();
+    const duplicate = wholesalers.find(
+        w => w.name.trim().toLowerCase() === normalizedName && w.id !== editingId
+        );
+
+    if (duplicate) {
+        setMessage('Wholesaler with this name already exists');
+        return;
+    }
+
     try {
       if (editingId) {
-        updateWholesaler(editingId, formData.name, formData.contactNumber);
+        updateWholesaler(editingId, formData.name, formData.contactNumber, formData.gstNumber);
         setMessage('Wholesaler updated successfully');
         setEditingId(null);
       } else {
-        addWholesaler(formData.name, formData.contactNumber);
+        // Add new wholesaler and capture the returned wholesaler object
+        const newWholesaler = await addWholesaler({
+          name: formData.name,
+          phone: formData.contactNumber,
+          gstNumber: formData.gstNumber,
+        });
+
+        console.log('✅ New wholesaler created:', newWholesaler);
+        console.log('📝 Setting selectedWholesalerId to:', newWholesaler.id);
+
+        setSelectedWholesalerId(newWholesaler.id);
         setMessage('Wholesaler added successfully');
       }
-      setFormData({ name: '', contactNumber: '' });
+      setFormData({ name: '', contactNumber: '', gstNumber: '' });
       setShowForm(false);
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
@@ -45,12 +65,17 @@ const WholesalersManager = () => {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this wholesaler?')) {
-      deleteWholesaler(id);
-      setMessage('Wholesaler deleted successfully');
-      setTimeout(() => setMessage(''), 2000);
+  if (window.confirm('Are you sure you want to delete this wholesaler?')) {
+    deleteWholesaler(id);
+
+    if (id === selectedWholesalerId) {
+      setSelectedWholesalerId(null);
     }
-  };
+
+    setMessage('Wholesaler deleted successfully');
+    setTimeout(() => setMessage(''), 2000);
+        }
+    };
 
   const handleCancel = () => {
     setShowForm(false);
@@ -60,21 +85,76 @@ const WholesalersManager = () => {
 
   const selectedWholesaler = wholesalers.find(w => w.id === selectedWholesalerId);
 
+  console.log('🔄 WholesalersManager render:', {
+    wholesalesCount: wholesalers.length,
+    wholesalers: wholesalers.map(w => ({ id: w.id, name: w.name })),
+    selectedWholesalerId,
+    selectedWholesalerIdType: typeof selectedWholesalerId,
+    selectedWholesaler,
+    dropdownValue: document.getElementById('wholesalerSelect')?.value
+  });
+
   return (
     <div className="card space-y-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-bold">🏢 Wholesaler Selection</h3>
         <button
+          disabled={disabled}
           onClick={() => setShowForm(!showForm)}
           className={`px-4 py-2 rounded font-semibold transition ${
+            disabled ? 'bg-gray-200 text-gray-500 cursor-not-allowed' :
             showForm
               ? 'bg-gray-400 text-white hover:bg-gray-500'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {showForm ? 'Cancel' : '+ Add Wholesaler'}
+          {showForm ? 'Cancel' : '+ Add New Wholesaler'}
         </button>
       </div>
+      {/* Select existing wholesaler */}
+    <div className="bg-white p-4 rounded-lg border space-y-2">
+        <label className="block text-sm font-semibold">
+            Select Wholesaler *
+        </label>
+        <select
+          disabled={disabled}
+          value={selectedWholesalerId ?? ''}
+          onChange={(e) =>
+            setSelectedWholesalerId(
+              e.target.value ? Number(e.target.value) : null
+            )
+          }
+          className={`w-full px-3 py-2 border rounded ${
+            disabled ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'
+          }`}
+        >
+
+        <option value="">-- Select Wholesaler --</option>
+        {wholesalers.map(w => (
+         <option key={w.id} value={w.id}>
+            {w.name}
+         </option>
+        ))}
+        </select>
+        <p className="text-xs text-gray-500">
+        Choose a wholesaler before adding products or batches
+        </p>
+    </div>
+    <div className="flex justify-end">
+        <button
+            disabled={disabled}
+            type="button"
+            onClick={() => setShowForm(true)}
+            className={`text-sm font-semibold ${
+              disabled
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-blue-600 hover:underline'
+            }`}
+        >
+            + Add New Wholesaler
+        </button>
+    </div>
+
 
       {message && (
         <div className={`p-3 rounded ${message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
@@ -84,7 +164,7 @@ const WholesalersManager = () => {
 
       {/* Form for adding/editing wholesaler */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-blue-50 p-4 rounded-lg space-y-3">
+        <div className="bg-blue-50 p-4 rounded-lg space-y-3">
           <div>
             <label className="block text-sm font-semibold mb-1">Wholesaler Name *</label>
             <input
@@ -109,23 +189,39 @@ const WholesalersManager = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
-            >
-              {editingId ? 'Update' : 'Add'} Wholesaler
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="flex-1 px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 font-semibold"
-            >
-              Cancel
-            </button>
+          <div>
+              <label className="block text-sm font-semibold mb-1">
+                GST Number (Optional)
+              </label>
+              <input
+                type="text"
+                name="gstNumber"
+                value={formData.gstNumber}
+                onChange={handleFormChange}
+                placeholder="e.g. 27ABCDE1234F1Z5"
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
           </div>
-        </form>
+
+          <div className="mt-4 flex justify-end gap-3">
+            <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-semibold"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                onClick={handleSubmit}
+                className="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
+          >
+              Add Wholesaler
+          </button>
+         </div>
+
+        </div>
       )}
 
       {/* Current selection info */}

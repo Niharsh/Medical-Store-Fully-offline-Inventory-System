@@ -40,7 +40,8 @@ export const InvoiceProvider = ({ children }) => {
   const createInvoice = useCallback(async (invoiceData) => {
     try {
       const newInvoice = await invoiceService.create(invoiceData);
-      setInvoices([newInvoice, ...invoices]);
+      // setInvoices([newInvoice, ...invoices]);
+      setInvoices(prevInvoices => [newInvoice, ...prevInvoices]);
       setCurrentInvoice(newInvoice);
       return newInvoice;
     } catch (err) {

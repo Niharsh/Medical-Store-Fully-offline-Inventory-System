@@ -4,16 +4,19 @@ import { useWholesalers } from '../../context/WholesalersContext';
 import WholesalersManager from '../Wholesalers/WholesalersManager';
 import ErrorAlert from '../Common/ErrorAlert';
 
-const AddProductForm = ({ onProductAdded }) => {
-  const { addProduct, error, productTypes, fetchProductTypes } = useProducts();
-  const { selectedWholesalerId, recordPurchase, getLastPurchasePrice, wholesalers } = useWholesalers();
+
+const AddProductForm = ({ onProductAdded, editingProduct }) => {
+  const { addProduct, updateProduct, error, productTypes, hsns, fetchProductTypes, fetchHSNs } = useProducts();
+  const { selectedWholesalerId, setSelectedWholesalerId, recordPurchase, getLastPurchasePrice, wholesalers } = useWholesalers();
   const [formError, setFormError] = useState('');
   const [priceComparisonMsg, setPriceComparisonMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [typesLoading, setTypesLoading] = useState(true);
+  const [hsnLoading, setHsnLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     product_type: 'tablet',
+    hsn: null,
     generic_name: '',
     manufacturer: '',
     salt_composition: '',
@@ -21,6 +24,7 @@ const AddProductForm = ({ onProductAdded }) => {
     description: '',
     batches: [], // Array of batch objects
   });
+  const isEditMode = Boolean(formData?.id);
   const [batchForm, setBatchForm] = useState({
     batch_number: '',
     mrp: '',
@@ -30,20 +34,47 @@ const AddProductForm = ({ onProductAdded }) => {
     expiry_date: '',
   });
 
-  // Load product types on component mount
+  // Load product types and HSN codes on component mount
   useEffect(() => {
-    const loadTypes = async () => {
+    const loadData = async () => {
       try {
         setTypesLoading(true);
-        await fetchProductTypes();
+        setHsnLoading(true);
+        await Promise.all([
+          fetchProductTypes(),
+          fetchHSNs(),
+        ]);
       } catch (err) {
-        console.error('Failed to load product types:', err);
+        console.error('Failed to load product types or HSN codes:', err);
       } finally {
         setTypesLoading(false);
+        setHsnLoading(false);
       }
     };
-    loadTypes();
-  }, [fetchProductTypes]);
+    loadData();
+  }, [fetchProductTypes, fetchHSNs]);
+
+  // 🔁 Prefill form when editing a product
+  useEffect(() => {
+    if (editingProduct) {
+      setFormData({
+        id: editingProduct.id,
+        name: editingProduct.name || '',
+        product_type: editingProduct.product_type || 'tablet',
+        hsn: editingProduct.hsn || null,
+        generic_name: editingProduct.generic_name || '',
+        manufacturer: editingProduct.manufacturer || '',
+        salt_composition: editingProduct.salt_composition || '',
+        unit: editingProduct.unit || 'pc',
+        description: editingProduct.description || '',
+        batches: editingProduct.batches || [],
+      });
+        if (editingProduct.batches?.length > 0) {
+        setSelectedWholesalerId(editingProduct.batches[0].wholesaler_id);
+      }
+    }
+  }, [editingProduct]);
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -67,8 +98,8 @@ const AddProductForm = ({ onProductAdded }) => {
     setPriceComparisonMsg('');
 
     // Validate wholesaler selection
-    if (!selectedWholesalerId) {
-      setFormError('Please select a wholesaler first');
+    if (!selectedWholesalerId && !isEditMode) {
+      setFormError('Please select wholesaler before adding product batches');
       return;
     }
 
@@ -85,20 +116,39 @@ const AddProductForm = ({ onProductAdded }) => {
       setFormError('Valid Selling Rate is required');
       return;
     }
-    if (!batchForm.cost_price || parseFloat(batchForm.cost_price) < 0) {
-      setFormError('Valid Cost Price is required');
-      return;
-    }
-    if (!batchForm.quantity || parseInt(batchForm.quantity) <= 0) {
-      setFormError('Quantity must be greater than 0');
+    if (!batchForm.cost_price || parseFloat(batchForm.cost_price) <= 0) {
+      setFormError('Cost price must be greater than 0');
       return;
     }
 
-    // Check for duplicate batch number
-    if (formData.batches.find(b => b.batch_number === batchForm.batch_number.trim())) {
-      setFormError('Batch number already exists for this product');
+    const quantity = Number(batchForm.quantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setFormError('Quantity must be a whole number');
       return;
     }
+
+    if (parseFloat(batchForm.selling_rate) > parseFloat(batchForm.mrp)) {
+      setFormError('Selling rate cannot be greater than MRP');
+      return;
+    }
+    if (!batchForm.expiry_date) {
+      setFormError('Expiry date is required');
+      return;
+    }
+
+
+
+    // Check for duplicate batch number
+    if (
+      formData.batches.find(
+        b =>
+          b.batch_number === batchForm.batch_number.trim() &&
+          b.wholesaler_id === selectedWholesalerId
+        )
+      ) {
+          setFormError('This batch already exists for the selected wholesaler');
+          return;
+        }
 
     // Check for price differences from previous purchases of this product from same wholesaler
     const lastPurchase = getLastPurchasePrice(selectedWholesalerId, formData.name.trim());
@@ -117,7 +167,7 @@ const AddProductForm = ({ onProductAdded }) => {
       quantity: parseInt(batchForm.quantity),
       expiry_date: batchForm.expiry_date || null,
       wholesaler_id: selectedWholesalerId,
-      purchase_date: new Date().toISOString().split('T')[0],
+      // purchase_date: new Date().toISOString().split('T')[0],
     };
 
     setFormData(prev => ({
@@ -125,7 +175,7 @@ const AddProductForm = ({ onProductAdded }) => {
       batches: [...prev.batches, newBatch]
     }));
 
-    // Reset batch form
+    // Reset batch form fields
     setBatchForm({
       batch_number: '',
       mrp: '',
@@ -136,6 +186,7 @@ const AddProductForm = ({ onProductAdded }) => {
     });
   };
 
+  // Remove batch from product
   const handleRemoveBatch = (index) => {
     setFormData(prev => ({
       ...prev,
@@ -163,8 +214,20 @@ const AddProductForm = ({ onProductAdded }) => {
         ...formData,
         name: formData.name.trim(),
       };
+      console.log('📤 AddProductForm: Sending payload with', payload.batches.length, 'batches:', payload);
 
-      const newProduct = await addProduct(payload);
+      let savedProduct;
+
+      if (isEditMode) {
+        savedProduct = await updateProduct(formData.id, payload);
+      } else {
+        savedProduct = await addProduct(payload);
+      }
+  
+      console.log('✅ Product saved:', savedProduct);
+
+      console.log('✅ AddProductForm: Product saved successfully:', savedProduct);
+      
       
       // Record purchases in wholesaler context for each batch
       formData.batches.forEach(batch => {
@@ -179,28 +242,32 @@ const AddProductForm = ({ onProductAdded }) => {
       });
       
       // Reset form
-      setFormData({
-        name: '',
-        product_type: 'tablet',
-        generic_name: '',
-        manufacturer: '',
-        salt_composition: '',
-        unit: 'pc',
-        description: '',
-        batches: [],
-      });
-      setBatchForm({
-        batch_number: '',
-        mrp: '',
-        selling_rate: '',
-        cost_price: '',
-        quantity: '',
-        expiry_date: '',
-      });
-      setPriceComparisonMsg('');
+      if (!isEditMode) {
+        setFormData({
+          name: '',
+          product_type: 'tablet',
+          hsn: null,
+          generic_name: '',
+          manufacturer: '',
+          salt_composition: '',
+          unit: 'pc',
+          description: '',
+          batches: [],
+        });
+        setBatchForm({
+          batch_number: '',
+          mrp: '',
+          selling_rate: '',
+          cost_price: '',
+          quantity: '',
+          expiry_date: '',
+        });
+        setPriceComparisonMsg('');
+      }
+
 
       if (onProductAdded) {
-        onProductAdded(newProduct);
+        onProductAdded(savedProduct);
       }
     } catch (err) {
       setFormError(err.message || 'Failed to add product');
@@ -210,28 +277,31 @@ const AddProductForm = ({ onProductAdded }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card max-w-2xl">
-      <h2 className="text-2xl font-bold mb-6">Add New Product</h2>
+    <form onSubmit={handleSubmit} className="card">
+      <h2 className="section-header-lg">
+        {editingProduct ? 'Edit Product' : 'Add New Product'}
+      </h2>
+
 
       {(formError || error) && (
         <ErrorAlert error={formError || error} onDismiss={() => setFormError('')} />
       )}
 
       {/* Wholesaler Manager Section */}
-      <div className="mb-8 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-        <h3 className="text-lg font-semibold mb-4 text-purple-900">1. Select Wholesaler</h3>
-        <WholesalersManager />
+      <div className="mb-8 p-5 bg-purple-50 border-l-4 border-purple-600 rounded-lg">
+        <h3 className="section-subheader text-purple-900">Step 1: Select Wholesaler</h3>
+        <WholesalersManager disabled={isEditMode} />
         {!selectedWholesalerId && (
-          <div className="mt-3 p-3 bg-yellow-100 text-yellow-800 rounded text-sm">
+          <div className="alert alert-warning mt-3">
             ⚠️ Please select a wholesaler before adding product batches
           </div>
         )}
       </div>
 
-      <h3 className="text-lg font-semibold mb-4 text-gray-900">2. Product Details</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <h3 className="section-subheader divider-section">Step 2: Product Details</h3>
+      <div className="grid-cols-form">
         <div>
-          <label className="block font-semibold mb-2">Product Name *</label>
+          <label className="form-label form-label-required">Product Name</label>
           <input
             type="text"
             name="name"
@@ -243,9 +313,9 @@ const AddProductForm = ({ onProductAdded }) => {
         </div>
 
         <div>
-          <label className="block font-semibold mb-2">Product Type *</label>
+          <label className="form-label form-label-required">Product Type</label>
           {typesLoading ? (
-            <div className="input-field bg-gray-100 text-gray-500">Loading types...</div>
+            <div className="input-field bg-gray-100 text-gray-500 py-2.5">Loading types...</div>
           ) : (
             <select
               name="product_type"
@@ -255,7 +325,7 @@ const AddProductForm = ({ onProductAdded }) => {
             >
               <option value="">-- Select Product Type --</option>
               {productTypes.map(type => (
-                <option key={type.id} value={type.id}>
+                <option key={type.name} value={type.name}>
                   {type.label}
                 </option>
               ))}
@@ -264,7 +334,39 @@ const AddProductForm = ({ onProductAdded }) => {
         </div>
 
         <div>
-          <label className="block font-semibold mb-2">Generic Name</label>
+          <label className="form-label">HSN Code (for GST)</label>
+          {hsnLoading ? (
+            <div className="input-field bg-gray-100 text-gray-500 py-2.5">Loading HSN codes...</div>
+          ) : (
+            <select
+              name="hsn"
+              value={formData.hsn || ''}
+              onChange={(e) => {
+                const selectedCode = e.target.value;
+                setFormData(prev => ({
+                  ...prev,
+                  hsn: selectedCode ? selectedCode : null
+                }));
+              }}
+              className="input-field"
+            >
+              <option value="">-- No HSN Code --</option>
+              {hsns.map(hsn => (
+                <option key={hsn.hsn_code} value={hsn.hsn_code}>
+                  {hsn.hsn_code} - {hsn.description} ({hsn.gst_rate}% GST)
+                </option>
+              ))}
+            </select>
+          )}
+          {formData.hsn && (
+            <div className="text-sm text-green-700 mt-1">
+              ✅ Selected HSN will apply {hsns.find(h => h.hsn_code === formData.hsn)?.gst_rate}% GST during billing
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="form-label">Generic Name</label>
           <input
             type="text"
             name="generic_name"
@@ -276,7 +378,7 @@ const AddProductForm = ({ onProductAdded }) => {
         </div>
 
         <div>
-          <label className="block font-semibold mb-2">Manufacturer</label>
+          <label className="form-label">Manufacturer</label>
           <input
             type="text"
             name="manufacturer"
@@ -289,20 +391,20 @@ const AddProductForm = ({ onProductAdded }) => {
 
         {(formData.product_type === 'tablet' || formData.product_type === 'capsule') && (
           <div>
-            <label className="block font-semibold mb-2">Salt/Composition (Optional)</label>
+            <label className="form-label">Salt/Composition</label>
             <input
               type="text"
               name="salt_composition"
               value={formData.salt_composition}
               onChange={handleChange}
               className="input-field"
-              placeholder="e.g., Paracetamol 500mg, Amoxicillin 500mg + Clavulanic Acid 125mg"
+              placeholder="e.g., Paracetamol 500mg"
             />
           </div>
         )}
 
         <div>
-          <label className="block font-semibold mb-2">Unit</label>
+          <label className="form-label">Unit</label>
           <input
             type="text"
             name="unit"
@@ -313,8 +415,8 @@ const AddProductForm = ({ onProductAdded }) => {
           />
         </div>
 
-        <div className="md:col-span-2">
-          <label className="block font-semibold mb-2">Description</label>
+        <div className="lg:col-span-3">
+          <label className="form-label">Description</label>
           <textarea
             name="description"
             value={formData.description}
@@ -327,21 +429,21 @@ const AddProductForm = ({ onProductAdded }) => {
       </div>
 
       {/* Batch Management Section */}
-      <div className="mt-8 pt-6 border-t-2 border-gray-200">
-        <h3 className="text-lg font-semibold mb-4">3. Add Batches to This Product</h3>
+      <div className="divider-section">
+        <h3 className="section-subheader">Step 3: Add Batches to This Product</h3>
         
         {formError && formData.batches.length === 0 && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+          <div className="alert alert-danger">
             {formError}
           </div>
         )}
 
         {/* Batch Form */}
-        <div className="card bg-blue-50 mb-6">
-          <h4 className="font-semibold mb-4">New Batch</h4>
+        <div className="card-compact bg-blue-50 border border-blue-200 mb-6">
+          <h4 className="font-semibold mb-4 text-blue-900">New Batch</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className="block font-semibold mb-2">Batch Number *</label>
+            <div className="form-group">
+              <label className="form-label form-label-required">Batch Number</label>
               <input
                 type="text"
                 name="batch_number"
@@ -352,8 +454,8 @@ const AddProductForm = ({ onProductAdded }) => {
               />
             </div>
 
-            <div>
-              <label className="block font-semibold mb-2">MRP (₹) *</label>
+            <div className="form-group">
+              <label className="form-label form-label-required">MRP (₹)</label>
               <input
                 type="number"
                 name="mrp"
@@ -366,8 +468,8 @@ const AddProductForm = ({ onProductAdded }) => {
               />
             </div>
 
-            <div>
-              <label className="block font-semibold mb-2">Selling Rate (₹) *</label>
+            <div className="form-group">
+              <label className="form-label form-label-required">Selling Rate (₹)</label>
               <input
                 type="number"
                 name="selling_rate"
@@ -380,8 +482,8 @@ const AddProductForm = ({ onProductAdded }) => {
               />
             </div>
 
-            <div>
-              <label className="block font-semibold mb-2">Cost Price (₹) *</label>
+            <div className="form-group">
+              <label className="form-label form-label-required">Cost Price (₹)</label>
               <input
                 type="number"
                 name="cost_price"
@@ -394,8 +496,8 @@ const AddProductForm = ({ onProductAdded }) => {
               />
             </div>
 
-            <div>
-              <label className="block font-semibold mb-2">Quantity *</label>
+            <div className="form-group">
+              <label className="form-label form-label-required">Quantity</label>
               <input
                 type="number"
                 name="quantity"
@@ -407,8 +509,8 @@ const AddProductForm = ({ onProductAdded }) => {
               />
             </div>
 
-            <div>
-              <label className="block font-semibold mb-2">Expiry Date (Optional)</label>
+            <div className="form-group">
+              <label className="form-label">Expiry Date</label>
               <input
                 type="date"
                 name="expiry_date"
@@ -422,13 +524,13 @@ const AddProductForm = ({ onProductAdded }) => {
           <button
             onClick={handleAddBatch}
             type="button"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+            className="btn-primary"
           >
             + Add Batch
           </button>
 
           {priceComparisonMsg && (
-            <div className="mt-4 p-3 bg-blue-100 border border-blue-300 text-blue-800 rounded text-sm">
+            <div className="alert alert-info mt-4">
               {priceComparisonMsg}
             </div>
           )}
@@ -436,36 +538,104 @@ const AddProductForm = ({ onProductAdded }) => {
 
         {/* Batches List */}
         {formData.batches.length > 0 && (
-          <div>
-            <h4 className="font-semibold mb-3">Batches Added ({formData.batches.length})</h4>
-            <div className="space-y-2">
+          <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+            <h4 className="font-semibold mb-4 text-gray-900">Batches Added <span className="badge badge-success ml-2">{formData.batches.length}</span></h4>
+            <div className="space-y-3">
               {formData.batches.map((batch, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded"
+                  className="p-4 bg-white border-l-4 border-green-600 rounded space-y-3"
                 >
-                  <div>
-                    <div className="font-semibold">{batch.batch_number}</div>
-                    <div className="text-sm text-gray-600">
-                      MRP: ₹{parseFloat(batch.mrp).toFixed(2)} | Selling: ₹{parseFloat(batch.selling_rate).toFixed(2)} | Cost: ₹{parseFloat(batch.cost_price).toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Qty: {batch.quantity} {formData.unit}
-                      {batch.expiry_date && ` | Expiry: ${new Date(batch.expiry_date).toLocaleDateString()}`}
-                    </div>
-                    {batch.wholesaler_id && (
-                      <div className="text-sm text-purple-600 font-medium">
-                        Wholesaler: {wholesalers.find(w => w.id === batch.wholesaler_id)?.name || 'Unknown'}
-                      </div>
-                    )}
+                
+                  {/* Batch number (READ ONLY) */}
+                  <div className="font-semibold text-gray-900">
+                    Batch: {batch.batch_number}
                   </div>
+
+                  {/* Editable fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+                    {/* Selling Rate */}
+                    <div>
+                      <label className="text-sm font-medium">Selling Rate (₹)</label>
+                      <input
+                        type="number"
+                        value={batch.selling_rate}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          setFormData(prev => ({
+                            ...prev,
+                            batches: prev.batches.map((b, i) =>
+                              i === index ? { ...b, selling_rate: value } : b
+                            )
+                          }));
+                        }}
+                        className="input-field"
+                      />
+                    </div>
+                      
+                    {/* Quantity */}
+                    <div>
+                      <label className="text-sm font-medium">Quantity</label>
+                      <input
+                        type="number"
+                        value={batch.quantity}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          setFormData(prev => ({
+                            ...prev,
+                            batches: prev.batches.map((b, i) =>
+                              i === index ? { ...b, quantity: value } : b
+                            )
+                          }));
+                        }}
+                        className="input-field"
+                      />
+                    </div>
+                      
+                    {/* Expiry Date */}
+                    <div>
+                      <label className="text-sm font-medium">Expiry Date</label>
+                      <input
+                        type="date"
+                        value={batch.expiry_date || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            batches: prev.batches.map((b, i) =>
+                              i === index ? { ...b, expiry_date: value } : b
+                            )
+                          }));
+                        }}
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                      
+                  {/* Static info */}
+                  <div className="text-sm text-gray-600 grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div><strong>MRP:</strong> ₹{batch.mrp}</div>
+                    <div><strong>Cost:</strong> ₹{batch.cost_price}</div>
+                    <div><strong>Unit:</strong> {formData.unit}</div>
+                  </div>
+                      
+                  {/* Wholesaler */}
+                  {batch.wholesaler_id && (
+                    <div className="text-sm text-purple-600 font-medium">
+                      📦 Wholesaler: {wholesalers.find(w => w.id === batch.wholesaler_id)?.name || 'Unknown'}
+                    </div>
+                  )}
+
+                  {/* Delete batch */}
                   <button
                     onClick={() => handleRemoveBatch(index)}
                     type="button"
-                    className="text-red-600 hover:text-red-800 font-semibold text-sm"
+                    className="btn-danger btn-sm"
                   >
-                    Remove
+                    Delete Batch
                   </button>
+                
                 </div>
               ))}
             </div>
@@ -473,13 +643,18 @@ const AddProductForm = ({ onProductAdded }) => {
         )}
       </div>
 
-      <button
-        type="submit"
-        disabled={loading || formData.batches.length === 0}
-        className="btn-primary mt-6 w-full md:w-auto"
-      >
-        {loading ? 'Adding...' : 'Add Product'}
-      </button>
+      <div className="flex gap-3 mt-8">
+        <button
+          type="submit"
+          disabled={loading || formData.batches.length === 0}
+          className="btn-primary"
+        >
+          {isEditMode ? '✓ Update Product' : '✓ Add Product'}
+        </button>
+        {formData.batches.length === 0 && (
+          <span className="text-sm text-gray-500 py-2">Add at least one batch to continue</span>
+        )}
+      </div>
     </form>
   );
 };

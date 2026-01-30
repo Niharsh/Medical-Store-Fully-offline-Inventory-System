@@ -130,8 +130,12 @@ const SalesTable = ({ period = 'month' }) => {
                       </span>
                     )}
                   </td>
-                  <td className={`py-3 px-4 text-right font-semibold ${parseFloat(bill.amount_due) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    ₹{formatCurrency(bill.amount_due)}
+                  <td className={`py-3 px-4 text-right font-semibold ${
+                    bill.amount_due !== null && bill.amount_due !== undefined && parseFloat(bill.amount_due) > 0 
+                      ? 'text-orange-600' 
+                      : 'text-green-600'
+                  }`}>
+                    ₹{bill.amount_due !== null && bill.amount_due !== undefined ? formatCurrency(bill.amount_due) : '—'}
                   </td>
                   <td className="py-3 px-4 text-center">
                     {editingId === bill.id ? (

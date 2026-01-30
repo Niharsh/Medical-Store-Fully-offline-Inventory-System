@@ -1,18 +1,77 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProductProvider } from './context/ProductContext';
 import { InvoiceProvider } from './context/InvoiceContext';
+import InvoiceDetail from './pages/InvoiceDetail';
 import { SalesBillsProvider } from './context/SalesBillsContext';
 import { PurchaseBillsProvider } from './context/PurchaseBillsContext';
 import { WholesalersProvider } from './context/WholesalersContext';
 import Header from './components/Common/Header';
 import Navigation from './components/Common/Navigation';
+import ProtectedRoute from './components/Common/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
+import ProductSearch from './pages/ProductSearch';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import RecoveryMethodSelection from './pages/RecoveryMethodSelection';
+import AdminRecoveryIntro from './pages/AdminRecoveryIntro';
+import AdminCodeVerify from './pages/AdminCodeVerify';
 import './App.css';
+import ShopDetails from './components/Settings/ShopDetails';
+import AdminPasswordReset from './pages/AdminPasswordReset';
 
-function App() {
+
+// Inner app component that uses auth context
+function AppContent() {
+  const { auth, ownerExists, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If owner not yet created, show signup
+  if (ownerExists === false) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="*" element={<Navigate to="/signup" replace />} />
+        </Routes>
+      </Router>
+    );
+  }
+
+  // If owner exists but not authenticated, show login/password recovery pages
+  if (!auth) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<RecoveryMethodSelection />} />
+          <Route path="/forgot-password/email" element={<ForgotPasswordPage />} />
+          <Route path="/forgot-password/admin" element={<AdminRecoveryIntro />} />
+          <Route path="/forgot-password/admin/verify" element={<AdminCodeVerify />} />
+          <Route path="/forgot-password/admin/reset" element={<AdminPasswordReset />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+    );
+  }
+
+  // User is authenticated - show main app
   return (
     <Router>
       <ProductProvider>
@@ -21,16 +80,83 @@ function App() {
             <PurchaseBillsProvider>
               <WholesalersProvider>
                 <div className="min-h-screen bg-gray-50">
-                  <Header />
-                  <Navigation />
-                  <main className="max-w-7xl mx-auto px-4 py-8">
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/inventory" element={<Inventory />} />
-                      <Route path="/billing" element={<Billing />} />
-                      <Route path="/settings" element={<Settings />} />
-                    </Routes>
-                  </main>
+                  <div className="print-hidden">
+                    <Header />
+                    <Navigation />
+                  </div>
+                  <Routes>
+                    {/* Dashboard */}
+                    <Route 
+                      path="/dashboard" 
+                      element={
+                        <ProtectedRoute>
+                          <main className="w-full px-6 py-8 lg:px-8">
+                            <Dashboard />
+                          </main>
+                        </ProtectedRoute>
+                      } 
+                    />
+                    {/* Inventory */}
+                    <Route 
+                      path="/inventory" 
+                      element={
+                        <ProtectedRoute>
+                          <main className="w-full px-6 py-8 lg:px-8">
+                            <Inventory />
+                          </main>
+                        </ProtectedRoute>
+                      } 
+                    />
+                    {/* Billing */}
+                    <Route 
+                      path="/billing" 
+                      element={
+                        <ProtectedRoute>
+                          <main className="w-full px-6 py-8 lg:px-8">
+                            <Billing />
+                          </main>
+                        </ProtectedRoute>
+                      } 
+                    />
+                    {/* Invoice Detail */}
+                    <Route 
+                      path="/billing/invoices/:id" 
+                      element={
+                        <ProtectedRoute>
+                          <main className="w-full px-6 py-8 lg:px-8">
+                            <InvoiceDetail />
+                          </main>
+                        </ProtectedRoute>
+                      } 
+                    />
+                    {/* Settings */}
+                    <Route 
+                      path="/settings" 
+                      element={
+                        <ProtectedRoute>
+                          <main className="w-full px-6 py-8 lg:px-8">
+                            <Settings />
+                          </main>
+                        </ProtectedRoute>
+                      } 
+                    />
+                    {/* Search */}
+                    <Route 
+                      path="/search" 
+                      element={
+                        <ProtectedRoute>
+                          <main className="w-full px-6 py-8 lg:px-8">
+                            <ProductSearch />
+                          </main>
+                        </ProtectedRoute>
+                      } 
+                    />
+                    {/* Default redirect to dashboard */}
+                    <Route 
+                      path="/" 
+                      element={<Navigate to="/dashboard" replace />} 
+                    />
+                  </Routes>
                 </div>
               </WholesalersProvider>
             </PurchaseBillsProvider>
@@ -38,6 +164,14 @@ function App() {
         </InvoiceProvider>
       </ProductProvider>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import axios from 'axios';
+import api from '../services/api';
+import { useAuth } from './AuthContext';
 
 const PurchaseBillsContext = createContext();
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 export const PurchaseBillsProvider = ({ children }) => {
   const [purchaseBills, setPurchaseBills] = useState([]);
@@ -11,42 +10,66 @@ export const PurchaseBillsProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // ✅ FIXED: Check auth state before fetching
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
   // Fetch all purchase bills
   const fetchPurchaseBills = useCallback(async (params = {}) => {
+    // ✅ FIXED: Guard against unauthenticated requests
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_URL}/purchase-bills/`, { params });
+      const response = await api.get(`/purchase-bills/`, { params });
       setPurchaseBills(Array.isArray(response.data) ? response.data : response.data.results || []);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || 'Failed to fetch purchase bills');
       console.error('Failed to fetch purchase bills:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, authLoading]);
 
   // Fetch purchase summary
   const fetchSummary = useCallback(async (period = 'month', date = null) => {
+    // ✅ FIXED: Guard against unauthenticated requests
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     try {
       const params = { period };
       if (date) params.date = date;
-      const response = await axios.get(`${API_URL}/purchase-bills/summary/`, { params });
-      setSummary(response.data);
+      const response = await api.get(`/purchase-bills/summary/`, { params });
+      // Sanitize NaN values in summary
+      const sanitizedData = {
+        ...response.data,
+        total_purchases: response.data.total_purchases || 0,
+        total_paid: response.data.total_paid || 0,
+        total_due: (response.data.total_due !== null && response.data.total_due !== undefined) 
+          ? response.data.total_due 
+          : 0
+      };
+      setSummary(sanitizedData);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || 'Failed to fetch purchase summary');
       console.error('Failed to fetch purchase summary:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, authLoading]);
 
   // Create purchase bill
   const createPurchaseBill = useCallback(async (billData) => {
     try {
-      const response = await axios.post(`${API_URL}/purchase-bills/`, billData);
+      const response = await api.post(`/purchase-bills/`, billData);
+      setPurchaseBills(prevPurchaseBills => [response.data, ...prevPurchaseBills]);
+      // this line was changed to use functional update to avoid stale closure
       setPurchaseBills([response.data, ...purchaseBills]);
       return response.data;
     } catch (err) {
@@ -58,7 +81,7 @@ export const PurchaseBillsProvider = ({ children }) => {
   // Update purchase bill
   const updatePurchaseBill = useCallback(async (billId, billData) => {
     try {
-      const response = await axios.patch(`${API_URL}/purchase-bills/${billId}/`, billData);
+      const response = await api.patch(`/purchase-bills/${billId}/`, billData);
       setPurchaseBills(purchaseBills.map(bill => bill.id === billId ? response.data : bill));
       return response.data;
     } catch (err) {
@@ -70,7 +93,7 @@ export const PurchaseBillsProvider = ({ children }) => {
   // Delete purchase bill
   const deletePurchaseBill = useCallback(async (billId) => {
     try {
-      await axios.delete(`${API_URL}/purchase-bills/${billId}/`);
+      await api.delete(`/purchase-bills/${billId}/`);
       setPurchaseBills(purchaseBills.filter(bill => bill.id !== billId));
     } catch (err) {
       setError(err.response?.data?.detail || err.message);

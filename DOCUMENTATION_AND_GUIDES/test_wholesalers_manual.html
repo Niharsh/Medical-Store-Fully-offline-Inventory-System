@@ -1,0 +1,319 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wholesaler Form Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 8px 16px;
+      margin-right: 8px;
+      margin-bottom: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-primary {
+      background: #0066cc;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #0052a3;
+    }
+    .btn-secondary {
+      background: #ddd;
+      color: #333;
+    }
+    .btn-secondary:hover {
+      background: #ccc;
+    }
+    .message {
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+    }
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    #log {
+      background: #222;
+      color: #0f0;
+      padding: 12px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      height: 300px;
+      overflow-y: auto;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .section-title {
+      margin-top: 20px;
+      margin-bottom: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      border-bottom: 2px solid #0066cc;
+      padding-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Wholesaler Manager Test</h1>
+    <p>This page tests the localStorage-based wholesaler management logic.</p>
+
+    <div class="section-title">Add New Wholesaler</div>
+    
+    <div id="message"></div>
+
+    <form id="wholesalerForm">
+      <label for="name">Wholesaler Name *</label>
+      <input 
+        type="text" 
+        id="name" 
+        name="name" 
+        placeholder="Enter wholesaler name"
+        required
+      >
+
+      <label for="contact">Contact Number</label>
+      <input 
+        type="text" 
+        id="contact" 
+        name="contact" 
+        placeholder="Enter contact number"
+      >
+
+      <div>
+        <button type="submit" class="btn-primary">+ Add Wholesaler</button>
+        <button type="button" class="btn-secondary" onclick="clearForm()">Clear</button>
+      </div>
+    </form>
+
+    <div class="section-title">Select Wholesaler</div>
+    
+    <label for="wholesalerSelect">Select Wholesaler *</label>
+    <select id="wholesalerSelect">
+      <option value="">-- Select Wholesaler --</option>
+    </select>
+
+    <div style="margin-top: 12px;">
+      <button type="button" class="btn-secondary" onclick="deleteSelected()">Delete Selected</button>
+      <button type="button" class="btn-secondary" onclick="clearData()">Clear All Data</button>
+    </div>
+
+    <div class="section-title">Console Log</div>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // Storage key
+    const STORAGE_KEY = 'inventory_wholesalers';
+
+    // State
+    let wholesalers = [];
+    let selectedWholesalerId = null;
+
+    // Logging
+    function log(message) {
+      const logEl = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      const logLine = `[${timestamp}] ${message}\n`;
+      logEl.textContent += logLine;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Load from localStorage
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          wholesalers = JSON.parse(saved);
+          log(`✅ Loaded ${wholesalers.length} wholesalers from localStorage`);
+        } catch (err) {
+          log(`❌ Error loading data: ${err.message}`);
+        }
+      } else {
+        log(`📭 No wholesalers in localStorage yet`);
+      }
+    }
+
+    // Save to localStorage
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(wholesalers));
+      log(`💾 Saved ${wholesalers.length} wholesalers to localStorage`);
+    }
+
+    // Add wholesaler
+    function addWholesaler(name, contact) {
+      const newWholesaler = {
+        id: Date.now().toString(),
+        name: name.trim(),
+        contactNumber: contact.trim(),
+        createdAt: new Date().toISOString()
+      };
+      
+      log(`🏢 Adding wholesaler: ${newWholesaler.name}`);
+      wholesalers.push(newWholesaler);
+      saveData();
+      
+      return newWholesaler;
+    }
+
+    // Delete wholesaler
+    function deleteWholesaler(id) {
+      const wholesaler = wholesalers.find(w => w.id === id);
+      if (wholesaler) {
+        log(`🗑️ Deleting wholesaler: ${wholesaler.name}`);
+        wholesalers = wholesalers.filter(w => w.id !== id);
+        saveData();
+        
+        if (selectedWholesalerId === id) {
+          selectedWholesalerId = null;
+          log(`⚠️ Deleted wholesaler was selected, clearing selection`);
+        }
+      }
+    }
+
+    // Render dropdown
+    function renderDropdown() {
+      const select = document.getElementById('wholesalerSelect');
+      const currentValue = select.value;
+      
+      select.innerHTML = '<option value="">-- Select Wholesaler --</option>';
+      wholesalers.forEach(w => {
+        const option = document.createElement('option');
+        option.value = w.id;
+        option.textContent = w.name;
+        select.appendChild(option);
+      });
+      
+      select.value = selectedWholesalerId || '';
+      
+      log(`🔄 Dropdown rendered with ${wholesalers.length} options`);
+      log(`   Selected value: ${selectedWholesalerId || '(none)'}`);
+    }
+
+    // Form submission
+    document.getElementById('wholesalerForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('name').value;
+      const contact = document.getElementById('contact').value;
+      
+      if (!name.trim()) {
+        showMessage('Please enter a wholesaler name', 'error');
+        return;
+      }
+
+      log(`\n📝 FORM SUBMIT STARTED`);
+      log(`   Input: name="${name}", contact="${contact}"`);
+      
+      const newWholesaler = addWholesaler(name, contact);
+      log(`   ✅ Wholesaler created with id=${newWholesaler.id}`);
+      
+      selectedWholesalerId = newWholesaler.id;
+      log(`   📝 Setting selectedWholesalerId to: ${selectedWholesalerId}`);
+      
+      renderDropdown();
+      
+      log(`   🎯 After rendering dropdown:`);
+      log(`      - Wholesalers in array: ${wholesalers.map(w => `${w.name}(${w.id})`).join(', ')}`);
+      log(`      - Selected ID: ${selectedWholesalerId}`);
+      log(`      - Dropdown value: ${document.getElementById('wholesalerSelect').value}`);
+      
+      showMessage('Wholesaler added successfully', 'success');
+      document.getElementById('wholesalerForm').reset();
+      
+      log(`📝 FORM SUBMIT COMPLETED\n`);
+    });
+
+    // Dropdown change
+    document.getElementById('wholesalerSelect').addEventListener('change', (e) => {
+      selectedWholesalerId = e.target.value || null;
+      log(`🔀 Dropdown changed to: ${selectedWholesalerId || '(none)'}`);
+    });
+
+    // Clear form
+    function clearForm() {
+      document.getElementById('wholesalerForm').reset();
+      log(`🧹 Form cleared`);
+    }
+
+    // Delete selected
+    function deleteSelected() {
+      if (!selectedWholesalerId) {
+        showMessage('Please select a wholesaler to delete', 'error');
+        return;
+      }
+      if (confirm('Delete this wholesaler?')) {
+        deleteWholesaler(selectedWholesalerId);
+        renderDropdown();
+        showMessage('Wholesaler deleted', 'success');
+      }
+    }
+
+    // Clear all data
+    function clearData() {
+      if (confirm('Clear ALL wholesaler data?')) {
+        localStorage.removeItem(STORAGE_KEY);
+        wholesalers = [];
+        selectedWholesalerId = null;
+        renderDropdown();
+        log(`🧹 All data cleared`);
+        showMessage('All data cleared', 'success');
+      }
+    }
+
+    // Show message
+    function showMessage(msg, type) {
+      const el = document.getElementById('message');
+      el.className = `message ${type}`;
+      el.textContent = msg;
+      setTimeout(() => el.textContent = '', 3000);
+    }
+
+    // Initialize
+    log(`🚀 Page loaded`);
+    loadData();
+    renderDropdown();
+  </script>
+</body>
+</html> -->

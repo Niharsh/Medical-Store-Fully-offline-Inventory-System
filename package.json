@@ -1,0 +1,58 @@
+{
+  "name": "choudhary-medical-store",
+  "version": "1.0.0",
+  "description": "Desktop billing software for Choudhary Medical Store",
+  "main": "electron/main.js",
+  "homepage": "./",
+  "author": "Choudhary Medical Store",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"cd frontend && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && python manage.py runserver 0.0.0.0:8000",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "cd frontend && npm run build",
+    "build:electron": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder -w",
+    "dist:portable": "npm run build && electron-builder -p never",
+    "pack": "electron-builder --dir",
+    "prestart": "npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.choudharymedical.billing",
+    "productName": "Choudhary Medical Store",
+    "directories": {
+      "buildResources": "frontend/public",
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "certificateFile": null,
+      "certificatePassword": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Choudhary Medical Store"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    }
+  }
+}

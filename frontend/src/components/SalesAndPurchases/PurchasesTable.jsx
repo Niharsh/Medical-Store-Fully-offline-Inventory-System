@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { usePurchaseBills } from '../../context/PurchaseBillsContext';
 
 const PurchasesTable = ({ period = 'month' }) => {
-  const { purchaseBills, loading, error, fetchPurchaseBills, updatePurchaseBill, deletePurchaseBill, searchPurchaseBills } = usePurchaseBills();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { purchaseBills, loading, error, fetchPurchaseBills, updatePurchaseBill, deletePurchaseBill } = usePurchaseBills();
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [message, setMessage] = useState('');
@@ -11,16 +10,6 @@ const PurchasesTable = ({ period = 'month' }) => {
   useEffect(() => {
     fetchPurchaseBills();
   }, [period]);
-
-  const handleSearch = async (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    if (value.trim()) {
-      await searchPurchaseBills(value);
-    } else {
-      await fetchPurchaseBills();
-    }
-  };
 
   const handleEditClick = (bill) => {
     setEditingId(bill.id);
@@ -93,16 +82,6 @@ const PurchasesTable = ({ period = 'month' }) => {
         </div>
       )}
 
-      <div className="flex gap-4 items-center mb-4">
-        <input
-          type="text"
-          placeholder="Search by Bill Number or Wholesaler..."
-          value={searchTerm}
-          onChange={handleSearch}
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded">
           Error: {error}
@@ -132,9 +111,9 @@ const PurchasesTable = ({ period = 'month' }) => {
               {purchaseBills.map(bill => (
                 <tr key={bill.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="py-3 px-4 font-semibold">{bill.bill_number}</td>
-                  <td className="py-3 px-4 text-gray-600">{formatDate(bill.date)}</td>
+                  <td className="py-3 px-4 text-gray-600">{bill.purchase_date ? formatDate(bill.purchase_date) : '-'}</td>
                   <td className="py-3 px-4">{bill.wholesaler_name}</td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{bill.contact_number || '-'}</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">{bill.wholesaler_contact || '-'}</td>
                   <td className="py-3 px-4 text-right font-semibold">₹{formatCurrency(bill.total_amount)}</td>
                   <td className="py-3 px-4 text-right">
                     {editingId === bill.id ? (
@@ -152,8 +131,12 @@ const PurchasesTable = ({ period = 'month' }) => {
                       </span>
                     )}
                   </td>
-                  <td className={`py-3 px-4 text-right font-semibold ${parseFloat(bill.amount_due) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    ₹{formatCurrency(bill.amount_due)}
+                  <td className={`py-3 px-4 text-right font-semibold ${
+                    bill.amount_due !== null && bill.amount_due !== undefined && parseFloat(bill.amount_due) > 0 
+                      ? 'text-orange-600' 
+                      : 'text-green-600'
+                  }`}>
+                    ₹{bill.amount_due !== null && bill.amount_due !== undefined ? formatCurrency(bill.amount_due) : '—'}
                   </td>
                   <td className="py-3 px-4 text-center">
                     {editingId === bill.id ? (

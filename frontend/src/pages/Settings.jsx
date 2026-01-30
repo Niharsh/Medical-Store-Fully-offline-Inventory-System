@@ -1,32 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { useProducts } from '../context/ProductContext';
 import ProductTypeManager from '../components/Product/ProductTypeManager';
+import HSNManager from '../components/Product/HSNManager';
 import ErrorAlert from '../components/Common/ErrorAlert';
+import ShopDetails from "../components/Settings/ShopDetails";
+
 
 /**
- * Settings Page - Allows owner to manage product types and other system settings
+ * Settings Page - Allows owner to manage product types, HSN codes, and other system settings
  */
 const Settings = () => {
   const { 
     productTypes, 
-    fetchProductTypes, 
+    hsns,
+    fetchProductTypes,
+    fetchHSNs,
     addProductType, 
     deleteProductType,
+    addHSN,
+    updateHSN,
+    deleteHSN,
     loading,
     error 
   } = useProducts();
   const [localError, setLocalError] = useState('');
 
-  // Load product types on mount
+  // Load product types and HSN codes on mount
   useEffect(() => {
-    loadProductTypes();
+    loadData();
   }, []);
 
-  const loadProductTypes = async () => {
+  const loadData = async () => {
     try {
-      await fetchProductTypes();
+      await Promise.all([
+        fetchProductTypes(),
+        fetchHSNs(),
+      ]);
     } catch (err) {
-      setLocalError('Failed to load product types');
+      setLocalError('Failed to load settings data');
       console.error(err);
     }
   };
@@ -50,6 +61,35 @@ const Settings = () => {
     }
   };
 
+  const handleAddHSN = async (hsnData) => {
+    try {
+      setLocalError('');
+      await addHSN(hsnData);
+      return Promise.resolve();
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const handleUpdateHSN = async (hsnCode, hsnData) => {
+    try {
+      setLocalError('');
+      await updateHSN(hsnCode, hsnData);
+      return Promise.resolve();
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const handleDeleteHSN = async (hsnCode) => {
+    try {
+      setLocalError('');
+      await deleteHSN(hsnCode);
+    } catch (err) {
+      setLocalError(err.message || 'Failed to delete HSN code');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -67,6 +107,10 @@ const Settings = () => {
           onDismiss={() => setLocalError('')} 
         />
       )}
+      {/* Shop Details Section */}
+      <div className="card">
+        <ShopDetails />
+      </div>
 
       {/* Product Type Manager */}
       <div className="card">
@@ -74,6 +118,17 @@ const Settings = () => {
           productTypes={productTypes}
           onTypeAdded={handleAddType}
           onTypeDeleted={handleDeleteType}
+          loading={loading}
+        />
+      </div>
+
+      {/* HSN Manager */}
+      <div className="card">
+        <HSNManager
+          hsns={hsns}
+          onHSNAdded={handleAddHSN}
+          onHSNUpdated={handleUpdateHSN}
+          onHSNDeleted={handleDeleteHSN}
           loading={loading}
         />
       </div>

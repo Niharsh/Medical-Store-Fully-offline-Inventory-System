@@ -1,53 +1,43 @@
-# Generic Medical Store Inventory & Billing System
+# 🏥 Medical Store Inventory & Billing System
 
-**Status**: 🚀 Frontend Ready | 📝 Backend Integration Guide Complete
+**Status**: ✅ **FULLY OPERATIONAL** | 🚀 Production Ready
 
-A modern, full-stack application for managing medical store inventory and billing operations. Supports multiple product types: tablets, syrups, powders, creams, diapers, condoms, sachets, and more. Built with **React + Vite** frontend and **Django REST Framework** backend architecture.
+A complete, full-stack application for managing medical store inventory and billing. Designed as a **solo-user system** for a single store owner/operator. Supports unlimited product types (tablets, syrups, powders, creams, diapers, condoms, sachets, custom types) with multi-batch inventory tracking, three-price model (MRP, Selling Rate, Cost Price), and comprehensive invoice management.
 
----
-
-## 🎯 Project Objectives
-
-✅ **Generic Product Support**: Works with any product type (not medicine-only)  
-✅ **Frontend-First Development**: UI created before backend  
-✅ **API-Driven Architecture**: Clear contracts between frontend and backend  
-✅ **Zero Refactor Guarantee**: Frontend needs NO changes when backend is ready  
-✅ **Separation of Concerns**: Each layer has explicit responsibilities  
-✅ **Production Ready**: Proper error handling, validation, and state management  
+**Built with**: React 18 + Vite (Frontend) | Django REST Framework (Backend) | SQLite (Database)
 
 ---
 
-## 📋 Quick Links
+## 🎯 What This System Does
 
-| Document | Purpose |
-|---|---|
-| **[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)** | 📁 Directory structure, setup instructions, technology stack |
-| **[API_CONTRACTS.md](./frontend/API_CONTRACTS.md)** | 📐 API specifications, endpoints, request/response formats |
-| **[BACKEND_INTEGRATION_GUIDE.md](./BACKEND_INTEGRATION_GUIDE.md)** | 🚀 Complete Django implementation guide |
-| **[FRONTEND_REFACTORING_SUMMARY.md](./FRONTEND_REFACTORING_SUMMARY.md)** | 🎨 Frontend changes, architecture decisions |
-| **[frontend/README.md](./frontend/README.md)** | 🌐 Frontend-specific documentation |
+### For a Solo Store Operator
+
+- **Manage Inventory**: Add products of any type, track multiple batches per product, monitor stock levels, and track expiry dates
+- **Process Sales**: Create invoices (bills) with multiple items, adjust selling prices on-the-fly, track payment status
+- **Track Purchases**: Record wholesale purchases, monitor cost prices, manage supplier relationships
+- **Manage Pricing**: Maintain three-price model for each product (MRP for display, Selling Rate for billing, Cost Price for profitability)
+- **View History**: Check past invoices, purchase records, and product details anytime
+
+### What You CAN Do
+✅ Add unlimited products of any type  
+✅ Track multiple batches per product with different prices and expiry dates  
+✅ Create invoices with multiple items in seconds  
+✅ Edit selling prices while billing (without affecting inventory data)  
+✅ View complete sales and purchase history  
+✅ Track payment status (Unpaid → Partial → Paid)  
+✅ Monitor low stock with built-in checks  
+✅ Export/view invoices for record keeping  
+
+### What You DON'T Need to Do
+❌ No coding knowledge required  
+❌ No database management  
+❌ No deployment complexity  
+❌ No API configuration  
+✅ Just run two commands and start using
 
 ---
 
-## 🚀 Getting Started
-
-### Quick Start (2 minutes)
-
-```bash
-# 1. Navigate to frontend directory
-cd frontend
-
-# 2. Start development server
-npm run dev
-
-# Server opens at http://localhost:5173
-```
-
-**Frontend is ready to use!** All API integrations are prepared and documented.
-
-### Full Setup (Frontend + Backend)
-
-#### Frontend (✅ Already Done)
+## 🚀 Quick Start (< 2 minutes)
 ```bash
 cd frontend
 npm install
@@ -265,6 +255,17 @@ python manage.py runserver
 4. Fill form and submit
 5. Check browser DevTools → Network tab for API request
 6. API call should go to `http://localhost:8000/api/products/`
+
+Admin Recovery (Offline) — automated test
+- Prerequisites:
+  - Start the frontend dev server: `cd frontend && npm run dev`
+  - Install frontend dev dependencies (once): `cd frontend && npm install`
+
+- Run automated acceptance test (frontend):
+  - `cd frontend && npm run test:admin-recovery`
+
+- Manual acceptance:
+  - See `DOCUMENTATION_AND_GUIDES/ADMIN_RECOVERY_OFFLINE.md` for step-by-step manual test instructions, expected results, and QA checklist.
 
 ---
 
