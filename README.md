@@ -154,7 +154,6 @@ python manage.py runserver 8001
 ```
 
 - **Missing Python package**: install it in the active venv:
-
 ```bash
 pip install <package-name>
 ```
