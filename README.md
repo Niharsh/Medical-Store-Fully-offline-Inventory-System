@@ -1,285 +1,212 @@
-🏥 Medical Inventory & Billing Management System
+# 🏥 Medical Store Inventory & Billing Management System
 
-A full-stack Medical Inventory and Billing Management System designed for medical shops and pharmacies, built to work both online and offline, with features like billing, stock management, expiry alerts, low-stock alerts, purchase tracking, and shop profile management.
+> A desktop-first, offline-capable medical store billing and inventory system designed for single-shop operators. Reliable in low- or no-network environments and packaged for desktop via Electron.
 
-This project is currently intended for single-user use (shop owner) and focuses on simplicity, reliability, and real-world pharmacy workflows.
+---
 
-🚀 Key Features
-📦 Inventory Management
+## ❓ Why this project exists
 
-Add, update, and delete medicines
+Small medical shops need a simple, dependable system that works even when internet connectivity is unreliable. This project provides a compact, offline-first billing and inventory workflow tailored to shop owners who need:
 
-Track:
+- Fast billing and invoice generation
+- Batch-based inventory and expiry management
+- Offline password recovery for local access when email is unavailable
 
-Medicine name
+---
 
-Batch number
+## ✨ Key features
 
-Expiry date
+### Inventory Management
 
-Purchase price & selling price
+- **Add / edit / remove products** with flexible product types
+- **Batch tracking** with quantities and per-batch expiry dates
+- **Search & filter** by name, type, or batch
+- **Low stock indicators** to highlight replenishment needs
 
-Quantity in stock
+### Expiry Management
 
-Automatic low stock alerts
+- **3-month and 1-month pre-expiry alerts** per batch
+- **Expiry dashboard** to review soon-to-expire stock
+- **Actions** to view or remove expired batches
 
-⏰ Expiry Management
+### Billing System
 
-Expiry notifications:
+- **Create invoices** with multiple line items
+- **Quantity shown before product name** (prints clearly on thermal/A4 receipts)
+- **Paid / pending amount handling** with clear invoice state
+- **₹NaN handling** guarded so invoices display correctly even when amounts are zero
+- **Print-friendly layouts** for thermal and A4 printing modes
 
-3 months before expiry
+### Purchase Management
 
-1 month before expiry
+- **Record supplier purchases** (supplier name, bill number, date, contact)
+- **Automatic stock updates** when purchase entries are created
+- **Purchase history** with search and filtering
 
-Dedicated expiry dashboard
+### Shop Profile Management
 
-Helps prevent loss due to expired medicines
+- **Shop details** (name, address, contact) used across invoices and reports
+- **Local Admin Recovery Code** (optional) stored in browser for offline password recovery
 
-🧾 Billing System
+---
 
-Create customer bills
+## 🛠 Tech stack
 
-Add multiple products per bill
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, Tailwind CSS, React Router |
+| Backend | Python, Django, Django REST Framework |
+| Database | SQLite (development) |
+| Packaging | Electron (desktop builds) |
+| Testing | Playwright (acceptance test) |
 
-Quantity shown before product name (for thermal/A4 printing clarity)
+---
 
-Handles:
+## 📁 Project folder structure
 
-Paid amount
-
-Pending amount
-
-₹NaN handling logic (only when paid amount is zero)
-
-Print-friendly bill layout (half A4 / thermal)
-
-🛒 Purchase Management
-
-Add purchase entries with:
-
-Supplier name
-
-Bill number
-
-Purchase date
-
-Contact number
-
-Purchase history table
-
-Automatically updates stock on purchase entry
-
-🏪 Shop Profile
-
-Manage shop details:
-
-Shop name
-
-Address
-
-Contact number
-
-Used across bills and reports
-
-🔍 Search & UX
-
-Fast medicine search
-
-Clean and simple UI
-
-Designed for daily medical shop usage
-
-🛠 Tech Stack
-Backend
-
-Python
-
-Django
-
-Django REST Framework
-
-SQLite (can be changed later)
-
-Frontend
-
-React (JSX)
-
-Axios for API calls
-
-Simple component-based structure
-
-📂 Project Structure (High Level)
+```
 project-root/
-│
-├── backend/
-│   ├── manage.py
-│   ├── requirements.txt
-│   ├── db.sqlite3
-│   └── apps/
-│
-├── frontend/
-│   ├── src/
-│   ├── package.json
-│   └── vite / react setup
-│
-└── README.md
+├── backend/                     # Django project, apps, migrations
+├── frontend/                    # React + Vite app (UI, pages, components)
+├── electron/                    # Electron packaging and preload scripts
+├── DOCUMENTATION_AND_GUIDES/    # Detailed docs, testing guides, QA checklists
+└── README.md                    # This file
+```
 
-🧑‍💻 How to Clone & Run This Project
-1️⃣ Clone the Repository
-git clone https://github.com/your-username/your-repo-name.git
+---
 
-cd your-repo-name
+## ✅ Step-by-step setup
 
-⚙️ Backend Setup (Django)
-2️⃣ Create Virtual Environment
-python -m venv venv
+Follow these steps to run the project locally (development mode):
 
+### 1) Clone repository
 
-Activate it:
+```bash
+git clone https://github.com/Niharsh/medical-store-inventory-system.git
+cd medical-store-inventory-system
+```
 
-Linux / macOS
+### 2) Backend setup (Django)
 
-source venv/bin/activate
+```bash
+# Create and activate a Python virtual environment (example uses .venv)
+cd backend
+python -m venv .venv
+source .venv/bin/activate    # Linux / macOS
+# For Windows use: .venv\Scripts\activate
 
-
-Windows
-
-venv\Scripts\activate
-
-
-👉 This isolates dependencies so versions don’t conflict.
-
-3️⃣ Install Backend Requirements
+# Install dependencies and apply migrations
 pip install -r requirements.txt
-
-
-📌 requirements.txt contains all required Python libraries like:
-
-Django
-
-djangorestframework
-
-corsheaders
-
-4️⃣ Run Migrations
-python manage.py makemigrations
 python manage.py migrate
 
-
-👉 These commands:
-
-Create database tables
-
-Apply model changes safely
-
-5️⃣ Start Backend Server
+# Start the backend server
 python manage.py runserver
+# Backend API base: http://127.0.0.1:8000/api/
+```
 
+Notes:
+- Use `python manage.py createsuperuser` to create an admin if needed for testing.
+- Database: SQLite is used by default for development.
 
-Backend will run at:
+### 3) Frontend setup (React)
 
-http://127.0.0.1:8000/
-
-🎨 Frontend Setup (React)
-6️⃣ Move to Frontend Folder
-cd frontend
-
-7️⃣ Install Frontend Dependencies
+```bash
+cd ../frontend
 npm install
-
-
-👉 This installs:
-
-React
-
-Axios
-
-Routing & UI dependencies
-
-8️⃣ Start Frontend Server
 npm run dev
+# Frontend dev server: http://localhost:5173
+```
 
+Notes:
+- If your backend API is running on a different host or port, set `VITE_API_URL` in `frontend/.env.local`.
+- Playwright is used only for the automated acceptance test and downloads browser binaries on first install.
 
-Frontend will run at:
+---
 
-http://localhost:5173/
+## 🔗 URLs (default development)
 
-🔗 API Connection
+- Frontend: http://localhost:5173
+- Backend API base: http://127.0.0.1:8000/api/
 
-Backend APIs are served at:
+---
 
-http://127.0.0.1:8000/api/
+## 🧠 Common commands (brief)
 
+| Command | Purpose |
+|---|---|
+| `git clone <repo>` | Clone repository |
+| `cd backend && python -m venv .venv && source .venv/bin/activate` | Create & activate Python venv |
+| `pip install -r requirements.txt` | Install backend dependencies |
+| `python manage.py migrate` | Apply migrations |
+| `python manage.py runserver` | Start Django dev server |
+| `cd frontend && npm install` | Install frontend dependencies |
+| `npm run dev` | Start Vite dev server |
+| `cd frontend && npm run test:admin-recovery` | Run Admin Recovery acceptance test (Playwright) |
 
-Example:
+---
 
-http://127.0.0.1:8000/api/shop-profile/
+## 🐞 Common issues & fixes
 
+- **Port already in use**: start Django on another port:
 
-Frontend uses Axios to connect to these endpoints.
-
-🧠 Common Commands Explained (So No One Gets Confused)
-Command	Meaning
-git clone	Downloads the project from GitHub
-python -m venv venv	Creates isolated Python environment
-pip install -r requirements.txt	Installs backend libraries
-makemigrations	Prepares database changes
-migrate	Applies database changes
-runserver	Starts Django backend
-npm install	Installs frontend libraries
-npm run dev	Starts React frontend
-🐞 Common Issues & Fixes
-❌ Port Already in Use
+```bash
 python manage.py runserver 8001
+```
 
-❌ Module Not Found
-pip install <module-name>
+- **Missing Python package**: install it in the active venv:
 
-❌ CORS Issue
+```bash
+pip install <package-name>
+```
 
-Make sure backend has:
+- **CORS errors**: enable or configure CORS in Django settings for the frontend origin during development (see `django-cors-headers`).
 
-CORS_ALLOW_ALL_ORIGINS = True
+- **Playwright download fails**: ensure network access for initial `npm install` (or install Playwright browsers manually).
 
-🔮 Future Enhancements
+---
 
-Multi-user login (Admin / Staff)
+## 🔮 Roadmap & future improvements
 
-Cloud sync + offline-first mode
+- Multi-user roles (Admin / Staff) and per-user permissions
+- Cloud sync with optional encryption and backup
+- Barcode scanner integration for quick billing
+- GST reporting and finance exports
+- Sales analytics & dashboards
+- Mobile client / PWA support
 
-Barcode scanner integration
+---
 
-GST reports
+## 📌 Intended usage
 
-Sales analytics dashboard
+- Single-shop medical stores (owner/operator focused)
+- Local system deployment (desktop-first)
+- Situations where network connectivity is unreliable
 
-Mobile app version
+---
 
-Auto backup & restore
+## 📄 License & usage notice
 
-📌 Intended Usage
+This project is provided under the **MIT License**. It is intended for educational and personal use; commercial terms can be discussed separately.
 
-Single medical shop
+---
 
-Local system deployment
+For additional developer documentation, testing guides, and QA checklists see `DOCUMENTATION_AND_GUIDES/`.
 
-Daily billing & inventory control
 
-No internet dependency required
+Extensive documentation is available under `DOCUMENTATION_AND_GUIDES/` (setup, architecture, testing guides, and developer notes).
 
-🤝 Contribution
+---
 
-Currently built for personal use, but contributions are welcome:
+## 🤝 Contributing
+- See `DOCUMENTATION_AND_GUIDES/DEVELOPER_GUIDE.md` for contribution guidelines and workflows
+- Please open issues or PRs for bugs or enhancements
 
-Fork the repo
+---
 
-Create a feature branch
+## 📄 License
+MIT
 
-Commit changes
+---
 
-Open a Pull Request
-
-📄 License
-
-This project is for educational and personal use.
-Commercial usage can be added later if required.
+If you want, I can add a GitHub Actions workflow to run the Admin Recovery acceptance test on push (CI).
+>>>>>>> ddb569d (docs: improve README formatting and setup instructions)
