@@ -67,17 +67,58 @@ Small medical shops need a simple, dependable system that works even when intern
 ```
 project-root/
 ├── backend/                     # Django project, apps, migrations
-├── frontend/                    # React + Vite app (UI, pages, components)
-├── electron/                    # Electron packaging and preload scripts
-├── DOCUMENTATION_AND_GUIDES/    # Detailed docs, testing guides, QA checklists
-└── README.md                    # This file
+# 🏥 Medical Store Inventory & Billing Management System
+
+A desktop-focused, offline-first medical store billing and inventory system built with Django, React, and Electron. Designed for single-shop operators who need reliable local billing without internet dependency.
+
+## 📌 Overview
+
+This system provides:
+
+- Local billing & invoice printing
+- Batch-based inventory tracking
+- Expiry management
+- Purchase tracking
+- Shop configuration management
+
+Tech stack:
+
+- Django (Backend API & business logic)
+- React (Frontend UI)
+- Electron (Desktop wrapper)
+- SQLite (Local database)
+
+The application is designed to run fully on a local machine without internet access.
+
+## 🏗 Architecture (Current Implementation)
+
+Electron → Django Server (127.0.0.1:8000) → SQLite (local file)
+
+Django serves both API and the built frontend. No cloud dependency.
+
+## 🖥 System Requirements
+
+Before running, install:
+
+1. Python 3.10+ — https://www.python.org/downloads/
+	- Verify: `python --version`
+2. Node.js 18+ — https://nodejs.org/
+	- Verify: `node --version` and `npm --version`
+3. Git (recommended) — https://git-scm.com/
+	- Verify: `git --version`
+
+## 📁 Project Structure
+
+```
+medical-store-inventory-system/
+├── backend/            # Django backend
+├── frontend/           # React source code
+├── electron/           # Electron main process
+├── DOCUMENTATION_AND_GUIDES/
+└── README.md
 ```
 
----
-
-## ✅ Step-by-step setup
-
-Follow these steps to run the project locally (development mode):
+## 🚀 How To Run (Development / Local Desktop Mode)
 
 ### 1) Clone repository
 
@@ -86,123 +127,81 @@ git clone https://github.com/Niharsh/medical-store-inventory-system.git
 cd medical-store-inventory-system
 ```
 
-### 2) Backend setup (Django)
+### 2) Backend setup (one-time)
 
-```bash
-# Create and activate a Python virtual environment (example uses .venv)
+Windows example:
+
+```powershell
 cd backend
 python -m venv .venv
-source .venv/bin/activate    # Linux / macOS
-# For Windows use: .venv\Scripts\activate
-
-# Install dependencies and apply migrations
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+# Set environment variables (example):
+$env:DJANGO_SECRET_KEY = "your-secret-here"
+$env:EMAIL_HOST_PASSWORD = "your-smtp-password"
 python manage.py migrate
-
-# Start the backend server
-python manage.py runserver
-# Backend API base: http://127.0.0.1:8000/api/
 ```
 
-Notes:
-- Use `python manage.py createsuperuser` to create an admin if needed for testing.
-- Database: SQLite is used by default for development.
-
-### 3) Frontend setup (React)
+macOS / Linux example:
 
 ```bash
-cd ../frontend
-npm install
-npm run dev
-# Frontend dev server: http://localhost:5173
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export DJANGO_SECRET_KEY="your-secret-here"
+export EMAIL_HOST_PASSWORD="your-smtp-password"
+python manage.py migrate
 ```
 
-Notes:
-- If your backend API is running on a different host or port, set `VITE_API_URL` in `frontend/.env.local`.
-- Playwright is used only for the automated acceptance test and downloads browser binaries on first install.
+### 3) Start backend server
 
----
+```powershell
+cd backend
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+# Server: http://127.0.0.1:8000/
+```
 
-## 🔗 URLs (default development)
+### 4) Run Electron (desktop)
 
-- Frontend: http://localhost:5173
-- Backend API base: http://127.0.0.1:8000/api/
-
----
-
-## 🧠 Common commands (brief)
-
-| Command | Purpose |
-|---|---|
-| `git clone <repo>` | Clone repository |
-| `cd backend && python -m venv .venv && source .venv/bin/activate` | Create & activate Python venv |
-| `pip install -r requirements.txt` | Install backend dependencies |
-| `python manage.py migrate` | Apply migrations |
-| `python manage.py runserver` | Start Django dev server |
-| `cd frontend && npm install` | Install frontend dependencies |
-| `npm run dev` | Start Vite dev server |
-| `cd frontend && npm run test:admin-recovery` | Run Admin Recovery acceptance test (Playwright) |
-
----
-
-## 🐞 Common issues & fixes
-
-- **Port already in use**: start Django on another port:
+Make sure the Django server above is running. From project root:
 
 ```bash
-python manage.py runserver 8001
+npx electron .
 ```
 
-- **Missing Python package**: install it in the active venv:
-```bash
-pip install <package-name>
-```
+> Note: The frontend dev server (`npm run dev`) is only required for frontend development. For desktop usage, Django serves the built frontend files.
 
-- **CORS errors**: enable or configure CORS in Django settings for the frontend origin during development (see `django-cors-headers`).
+## 🧾 Invoice & Print Behavior
 
-- **Playwright download fails**: ensure network access for initial `npm install` (or install Playwright browsers manually).
+- Half-page optimized layout
+- Exactly 15 line items per page (automatic continuation)
+- Customer DL and Address printed conditionally
+- Shop details pulled from settings
+- GST calculation (CGST + SGST split)
 
----
+## 📦 Database
 
-## 🔮 Roadmap & future improvements
+- SQLite local file
+- Offline, migration-controlled schema
 
-- Multi-user roles (Admin / Staff) and per-user permissions
-- Cloud sync with optional encryption and backup
-- Barcode scanner integration for quick billing
-- GST reporting and finance exports
-- Sales analytics & dashboards
-- Mobile client / PWA support
+## ⚠ Common issues & quick fixes
 
----
+- Port in use: `python manage.py runserver 8001`
+- Electron blank screen: ensure Django server is running before launching Electron
+- CORS/auth issues: check `config/settings.py` (CORS_ALLOWED_ORIGINS) when `DEBUG=True`
 
-## 📌 Intended usage
+## 📌 Intended Usage
 
-- Single-shop medical stores (owner/operator focused)
-- Local system deployment (desktop-first)
-- Situations where network connectivity is unreliable
-
----
-
-## 📄 License & usage notice
-
-This project is provided under the **MIT License**. It is intended for educational and personal use; commercial terms can be discussed separately.
-
----
-
-For additional developer documentation, testing guides, and QA checklists see `DOCUMENTATION_AND_GUIDES/`.
-
-
-Extensive documentation is available under `DOCUMENTATION_AND_GUIDES/` (setup, architecture, testing guides, and developer notes).
-
----
-
-## 🤝 Contributing
-- See `DOCUMENTATION_AND_GUIDES/DEVELOPER_GUIDE.md` for contribution guidelines and workflows
-- Please open issues or PRs for bugs or enhancements
-
----
+- Single-shop medical stores
+- Local desktop deployment
+- Offline-first billing
 
 ## 📄 License
-MIT
 
----
+MIT License
+
+## 👨‍💻 Author
+
+Niharsh
+
