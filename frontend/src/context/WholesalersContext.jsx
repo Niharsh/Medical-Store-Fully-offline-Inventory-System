@@ -1,9 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import api from '../services/api'; // or wherever axios instance is
-import { useAuth } from './AuthContext';
 
 const WholesalersContext = createContext();
-
 
 const PURCHASE_HISTORY_STORAGE_KEY = 'inventory_purchase_history';
 
@@ -12,24 +9,45 @@ export const WholesalersProvider = ({ children }) => {
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [selectedWholesalerId, setSelectedWholesalerId] = useState(null);
 
-  // ✅ FIXED: Check auth state before fetching
-  const { isAuthenticated, loading: authLoading } = useAuth();
-
-  // ✅ FIXED: Only fetch when authenticated and auth is not loading
+  // Fetch wholesalers from SQLite on mount
   useEffect(() => {
-    if (authLoading || !isAuthenticated) {
-      return;
+    const fetchWholesalers = async () => {
+      try {
+        if (window?.api?.getWholesalers) {
+          const response = await window.api.getWholesalers();
+          // Support both old and new structured responses
+          let wholesalerList = [];
+          if (!response) {
+            console.warn('[WholesalersContext] getWholesalers returned empty response');
+          } else if (response.success === false) {
+            console.error('[WholesalersContext] getWholesalers error:', response.message);
+          } else if (Array.isArray(response.data)) {
+            wholesalerList = response.data;
+          } else if (response.data && Array.isArray(response.data.results)) {
+            wholesalerList = response.data.results;
+          }
+          console.log('[WholesalersContext] Fetched wholesalers:', wholesalerList);
+          setWholesalers(wholesalerList || []);
+        } else {
+          console.warn('[WholesalersContext] window.api.getWholesalers not available');
+        }
+      } catch (err) {
+        console.error('[WholesalersContext] Failed to fetch wholesalers:', err);
+      }
+    };
+
+    fetchWholesalers();
+
+    // Restore purchase history from localStorage
+    const saved = localStorage.getItem(PURCHASE_HISTORY_STORAGE_KEY);
+    if (saved) {
+      try {
+        setPurchaseHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to restore purchase history:', e);
+      }
     }
-    
-    api.get('/wholesalers/')
-      .then(res => {
-        setWholesalers(res.data.results ?? res.data);
-      })
-      .catch(err => {
-        console.error('Failed to load wholesalers', err);
-        // Don't crash if 401 - auth guard will redirect
-      });
-  }, [isAuthenticated, authLoading]);
+  }, []);
   
   
 
@@ -39,36 +57,77 @@ export const WholesalersProvider = ({ children }) => {
     setPurchaseHistory(data);
   };
 
-  // Add new wholesaler
+  // Add new wholesaler using IPC to SQLite
   const addWholesaler = async ({ name, phone, gstNumber }) => {
-          const payload = {
-            name: name.trim(),
-            contact_number: phone?.trim() || '',
-            gst_number: gstNumber?.trim() || '',
-          };
-        
-          const res = await api.post('/wholesalers/', payload);
-          setWholesalers(prev => [...prev, res.data]);
-          return res.data;
-        };  
+    const payload = {
+      name: name.trim(),
+      contactNumber: phone?.trim() || '',
+      gstNumber: gstNumber?.trim() || '',
+    };
 
-
-  // Update wholesaler
-  const updateWholesaler = (id, name, contactNumber = '', gstNumber = '') => {
-    const updated = wholesalers.map(w => 
-      w.id === id 
-        ? { ...w, name: name.trim(), contactNumber: contactNumber.trim(), gstNumber: gstNumber.trim() }
-        : w
-    );
-    saveWholesalers(updated);
+    if (window?.api?.addWholesaler) {
+      try {
+        const response = await window.api.addWholesaler(payload);
+        if (!response || response.success === false) {
+          throw new Error(response?.message || 'addWholesaler failed');
+        }
+        const newWholesaler = response.data;
+        setWholesalers(prev => [...prev, newWholesaler]);
+        return newWholesaler;
+      } catch (err) {
+        console.error('[WholesalersContext] addWholesaler error:', err);
+        throw err;
+      }
+    } else {
+      throw new Error('window.api.addWholesaler is not available');
+    }
   };
 
-  // Delete wholesaler
-  const deleteWholesaler = (id) => {
-    const updated = wholesalers.filter(w => w.id !== id);
-    saveWholesalers(updated);
-    if (selectedWholesalerId === id) {
-      setSelectedWholesalerId(null);
+  // Update wholesaler using IPC to SQLite
+  const updateWholesaler = async (id, name, contactNumber = '', gstNumber = '') => {
+    const payload = {
+      name: name.trim(),
+      contactNumber: contactNumber.trim(),
+      gstNumber: gstNumber.trim(),
+    };
+
+    if (window?.api?.updateWholesaler) {
+      try {
+        const response = await window.api.updateWholesaler(id, payload);
+        if (!response || response.success === false) {
+          throw new Error(response?.message || 'updateWholesaler failed');
+        }
+        const updated = response.data;
+        setWholesalers(prev => prev.map(w => (w.id === id ? updated : w)));
+        return updated;
+      } catch (err) {
+        console.error('[WholesalersContext] updateWholesaler error:', err);
+        throw err;
+      }
+    } else {
+      throw new Error('window.api.updateWholesaler is not available');
+    }
+  };
+
+  // Delete wholesaler using IPC to SQLite
+  const deleteWholesaler = async (id) => {
+    if (window?.api?.deleteWholesaler) {
+      try {
+        const response = await window.api.deleteWholesaler(id);
+        if (!response || response.success === false) {
+          throw new Error(response?.message || 'deleteWholesaler failed');
+        }
+        setWholesalers(prev => prev.filter(w => w.id !== id));
+        if (selectedWholesalerId === id) {
+          setSelectedWholesalerId(null);
+        }
+        return true;
+      } catch (err) {
+        console.error('[WholesalersContext] deleteWholesaler error:', err);
+        throw err;
+      }
+    } else {
+      throw new Error('window.api.deleteWholesaler is not available');
     }
   };
 

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../services/api';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import ErrorAlert from '../components/Common/ErrorAlert';
 import InvoicePrint from '../components/Billing/InvoicePrint';
@@ -10,7 +9,7 @@ import { useShopDetails } from '../context/ShopDetailsContext';
  * InvoiceDetail Page - Full Invoice View
  * 
  * Architecture (Refactored):
- * 1. Fetch invoice data ONCE when page loads
+ * 1. Fetch invoice data ONCE when page loads using IPC
  * 2. Render the FULL medical invoice as the main content
  * 3. Add Print and Back buttons in a control bar (screen only)
  * 4. CSS handles showing/hiding interactive elements based on @media print
@@ -33,15 +32,23 @@ const InvoiceDetail = () => {
   const [error, setError] = useState('');
 
   /* =========================
-     FETCH INVOICE (ONCE)
+     FETCH INVOICE (ONCE) - VIA IPC
      ========================= */
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
-        const res = await api.get(`/invoices/${id}/`);
-        setInvoice(res.data);
+        if (!window?.api?.getInvoiceById) {
+          throw new Error('window.api.getInvoiceById not available');
+        }
+
+        const response = await window.api.getInvoiceById(parseInt(id));
+        if (response && response.success === false) {
+          throw new Error(response.message || 'Failed to load invoice');
+        }
+
+        setInvoice(response.data);
       } catch (err) {
-        setError('Failed to load invoice details');
+        setError(err.message || 'Failed to load invoice details');
       } finally {
         setLoading(false);
       }
@@ -51,9 +58,12 @@ const InvoiceDetail = () => {
   }, [id]);
 
   /* =========================
-     PRINT HANDLER (Simple)
+     PRINT HANDLER (native browser print - works best)
      ========================= */
   const handlePrint = () => {
+    console.log('[invoice] Print button clicked');
+    // Use native browser print dialog which shows all browser printing capabilities
+    // including "Print to PDF" option in most browsers
     window.print();
   };
 

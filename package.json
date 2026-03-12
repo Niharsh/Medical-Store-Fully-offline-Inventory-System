@@ -9,22 +9,21 @@
   "scripts": {
     "dev": "concurrently \"cd frontend && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && .venv\\Scripts\\python manage.py runserver 0.0.0.0:8000",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
     "build": "cd frontend && npm run build",
-    "build:backend": "cd backend && .venv\\Scripts\\python manage.py collectstatic --noinput",
-    "build:all": "npm run build && npm run build:backend",
-    "electron-builder": "npm run build:all && electron-builder",
-    "electron-build": "npm run build:all && electron-builder -w",
-    "dist": "npm run build:all && electron-builder",
-    "dist:portable": "npm run build:all && electron-builder -p never",
+    "test": "cd frontend && npm run test",
+    "electron-builder": "npm run build && electron-builder",
+    "electron-build": "npm run build && electron-builder -w",
+    "dist": "npm run build && electron-builder",
+    "dist:portable": "npm run build && electron-builder -p never",
     "pack": "electron-builder --dir",
     "prestart": "npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "electron": "^28.0.0",
+    "electron": "^27.3.11",
     "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9",
     "wait-on": "^7.2.0"
   },
   "build": {
@@ -57,5 +56,8 @@
     "portable": {
       "artifactName": "${productName}-${version}-portable.exe"
     }
+  },
+  "dependencies": {
+    "better-sqlite3": "^8.7.0"
   }
 }

@@ -3,7 +3,6 @@ import { useProducts } from '../context/ProductContext';
 import { useInvoices } from '../context/InvoiceContext';
 import { useSalesBills } from '../context/SalesBillsContext';
 import { usePurchaseBills } from '../context/PurchaseBillsContext';
-import api from '../services/api';
 import PurchasesTable from '../components/SalesAndPurchases/PurchasesTable';
 import PurchasesForm from '../components/SalesAndPurchases/PurchasesForm';
 
@@ -39,15 +38,24 @@ const Dashboard = () => {
   const [expiryError, setExpiryError] = useState('');
   const [salesPurchasesPeriod, setSalesPurchasesPeriod] = useState('month');
 
-  // Fetch low stock items from API
+  // Fetch low stock items from SQLite via IPC
   const fetchLowStockItems = async () => {
     setLowStockLoading(true);
     setLowStockError('');
     try {
-      const response = await api.get('/products/low_stock/');
-      console.log('✅ Low stock items fetched:', response.data);
-      setLowStockItems(response.data.low_stock_items || []);
-      setLowStockCount(response.data.count || 0);
+      if (!window?.api?.getLowStockItems) {
+        throw new Error('window.api.getLowStockItems not available');
+      }
+
+      const response = await window.api.getLowStockItems();
+      console.log('✅ Low stock items fetched:', response);
+      
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to fetch low stock items');
+      }
+
+      setLowStockItems(response.data?.low_stock_items || []);
+      setLowStockCount(response.data?.count || 0);
     } catch (error) {
       console.error('❌ Error fetching low stock items:', error);
       setLowStockError('Failed to fetch low stock information');
@@ -66,14 +74,23 @@ const Dashboard = () => {
     fetchPurchasesSummary(salesPurchasesPeriod);
   }, [salesPurchasesPeriod]);
 
-  // Fetch expiring batches from API
+  // Fetch expiring batches from SQLite via IPC
   const fetchExpiringBatches = async (months) => {
     setExpiryLoading(true);
     setExpiryError('');
     try {
-      const response = await api.get(`/batches/expiring/?months=${months}`);
-      console.log('✅ Expiring batches fetched:', response.data);
-      setExpiringBatches(response.data.batches || []);
+      if (!window?.api?.getExpiryOverview) {
+        throw new Error('window.api.getExpiryOverview not available');
+      }
+
+      const response = await window.api.getExpiryOverview(months);
+      console.log('✅ Expiring batches fetched:', response);
+      
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to fetch expiring batches');
+      }
+
+      setExpiringBatches(response.data?.batches || []);
     } catch (error) {
       console.error('❌ Error fetching expiring batches:', error);
       setExpiryError('Failed to fetch expiring products');

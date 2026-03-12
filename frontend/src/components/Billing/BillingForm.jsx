@@ -20,10 +20,14 @@ const BillingForm = ({ onBillingComplete }) => {
     discount_percent: '',
   });
   useEffect(() => {
-  if (products.length === 0) {
-    fetchProducts();
-  }
-}, []);
+    console.log('📋 BillingForm useEffect: products.length =', products.length);
+    if (products.length === 0) {
+      console.log('📋 BillingForm: Calling fetchProducts...');
+      fetchProducts();
+    } else {
+      console.log('📋 BillingForm: Products already loaded:', products.map(p => ({ id: p.id, name: p.name, hsn: p.hsn, gst_rate: p.gst_rate, batches: p.batches?.length || 0 })));
+    }
+  }, [products, fetchProducts]);
 
 
   const handleAddItem = () => {
@@ -35,6 +39,7 @@ const BillingForm = ({ onBillingComplete }) => {
       selling_rate: '', // Allow editing
       mrp: '',
       hsn_code: '', // Auto-filled from product
+      expiry_date: '', // Auto-filled from batch
       discount_percent: formData.discount_percent || '', // Pre-fill from top-level discount
       gst_percent: '', // Will be auto-filled from product's HSN if available
       is_return: false, // Return flag
@@ -49,6 +54,8 @@ const BillingForm = ({ onBillingComplete }) => {
     // Auto-fill batches, selling rate, HSN code, and GST if product is selected
     if (field === 'product_id' && value) {
       const selectedProduct = products.find(p => p.id === parseInt(value));
+      console.log('🔍 BillingForm: Selected product:', selectedProduct?.name, 'HSN:', selectedProduct?.hsn, 'GST Rate:', selectedProduct?.gst_rate, 'Batches:', selectedProduct?.batches?.length);
+      
       if (selectedProduct && selectedProduct.batches && selectedProduct.batches.length > 0) {
         // Set first batch as default
         updatedItems[index].batch_number = selectedProduct.batches[0].batch_number;
@@ -56,10 +63,12 @@ const BillingForm = ({ onBillingComplete }) => {
         updatedItems[index].selling_rate = selectedProduct.batches[0].selling_rate;
         updatedItems[index].mrp = selectedProduct.batches[0].mrp;
         
-        // 🆕 Auto-fill HSN code and GST from product's HSN
-        updatedItems[index].hsn_code = selectedProduct.hsn_code || '';
-        updatedItems[index].gst_percent = selectedProduct.gst_rate || '';
+        // ✅ Auto-fill HSN code from product.hsn and GST from gst_rate (convert to string)
+        updatedItems[index].hsn_code = selectedProduct.hsn || '';
+        updatedItems[index].gst_percent = String(selectedProduct.gst_rate || '');
+        console.log('✅ BillingForm: Auto-filled HSN:', updatedItems[index].hsn_code, 'GST:', updatedItems[index].gst_percent);
       } else {
+        console.log('⚠️ BillingForm: No product or batches found, clearing fields');
         updatedItems[index].batch_number = '';
         updatedItems[index].original_selling_rate = '';
         updatedItems[index].selling_rate = '';
@@ -69,7 +78,7 @@ const BillingForm = ({ onBillingComplete }) => {
       }
     }
 
-    // Auto-fill selling rate and MRP when batch is selected
+    // Auto-fill selling rate, MRP, and expiry date when batch is selected
     if (field === 'batch_number' && updatedItems[index].product_id) {
       const selectedProduct = products.find(p => p.id === parseInt(updatedItems[index].product_id));
       if (selectedProduct && selectedProduct.batches) {
@@ -78,6 +87,8 @@ const BillingForm = ({ onBillingComplete }) => {
           updatedItems[index].original_selling_rate = selectedBatch.selling_rate;
           updatedItems[index].selling_rate = selectedBatch.selling_rate;
           updatedItems[index].mrp = selectedBatch.mrp;
+          updatedItems[index].expiry_date = selectedBatch.expiry_date || '';
+          console.log('✅ BillingForm: Batch selected, expiry_date set to:', updatedItems[index].expiry_date);
         }
       }
     }
@@ -130,6 +141,8 @@ const BillingForm = ({ onBillingComplete }) => {
           original_selling_rate: parseFloat(item.original_selling_rate), // Store original for history
           selling_rate: parseFloat(item.selling_rate), // Final price (may be edited)
           mrp: parseFloat(item.mrp), // For invoice display only
+          hsn_code: item.hsn_code || '', // HSN code for invoice display
+          expiry_date: item.expiry_date || '', // Expiry date for invoice display
           discount_percent: parseFloat(item.discount_percent) || 0, // Per-item discount
           gst_percent: parseFloat(item.gst_percent) || 0, // Per-item GST
           is_return: item.is_return || false, // Return flag

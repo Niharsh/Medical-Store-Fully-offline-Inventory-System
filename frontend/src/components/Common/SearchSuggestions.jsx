@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../services/api';
 
 /**
  * SearchSuggestions - Live autocomplete for Navigation search bar
  * 
  * Features:
- * - Shows suggestions as user types (after 1 character)
+ * - Shows suggestions as user types (after 1 character) - SQLite powered
  * - Displays product name + type in dropdown
- * - Debounced backend calls (300ms)
+ * - Debounced suggestions (300ms)
  * - Keyboard navigation (arrow keys, Enter, Escape)
  * - Click outside to close
+ * - Prefix matching priority (from searchProducts)
  * - No existing search flow disruption
  */
 const SearchSuggestions = ({ searchQuery, onSelectSuggestion }) => {
@@ -20,7 +20,7 @@ const SearchSuggestions = ({ searchQuery, onSelectSuggestion }) => {
   const [debounceTimer, setDebounceTimer] = useState(null);
   const dropdownRef = useRef(null);
 
-  // Fetch suggestions with debounce
+  // Fetch suggestions with debounce - using SQLite via IPC
   useEffect(() => {
     // Clear existing timer
     if (debounceTimer) {
@@ -41,20 +41,23 @@ const SearchSuggestions = ({ searchQuery, onSelectSuggestion }) => {
         console.log(`🔍 Fetching suggestions for: "${searchQuery}"`);
         setIsLoading(true);
 
-        const response = await api.get('/products/', {
-          params: {
-            search: searchQuery.trim(),
-          },
-        });
+        if (!window?.api?.searchProducts) {
+          throw new Error('window.api.searchProducts not available');
+        }
 
-        // Handle paginated or direct response
-        const items = Array.isArray(response.data)
-          ? response.data
-          : response.data.results || [];
+        const response = await window.api.searchProducts(searchQuery.trim());
 
-        console.log(`✅ Got ${items.length} suggestions`);
+        if (response && response.success === false) {
+          throw new Error(response.message || 'Failed to fetch suggestions');
+        }
 
-        setSuggestions(items.slice(0, 8)); // Limit to 8 suggestions
+        // Extract results from IPC response
+        const items = response?.data?.results || [];
+
+        console.log(`✅ Got ${items.length} suggestions (limited to 8)`);
+
+        // Limit to 8 suggestions for dropdown
+        setSuggestions(items.slice(0, 8));
         setIsOpen(items.length > 0);
         setHighlightedIndex(-1);
       } catch (error) {

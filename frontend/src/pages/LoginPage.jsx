@@ -7,7 +7,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const { login, loading: authLoading } = useAuth();
   
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -16,10 +16,8 @@ const LoginPage = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      newErrors.email = 'Please enter a valid email';
+    if (!username) {
+      newErrors.username = 'Username is required';
     }
 
     if (!password) {
@@ -32,7 +30,7 @@ const LoginPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'email') setEmail(value);
+    if (name === 'username') setUsername(value);
     else setPassword(value);
 
     // Clear error for this field when user starts typing
@@ -54,12 +52,12 @@ const LoginPage = () => {
 
     try {
       setIsSubmitting(true);
-      await login(email, password);
+      await login(username, password);
       
       // Redirect to dashboard after successful login
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setGeneralError(err.response?.data?.detail || err.message || 'Invalid email or password');
+      setGeneralError(err.response?.data?.detail || err.message || 'Invalid username or password');
     } finally {
       setIsSubmitting(false);
     }
@@ -96,23 +94,23 @@ const LoginPage = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
+            {/* Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+                Username
               </label>
               <input
-                type="email"
-                name="email"
-                value={email}
+                type="text"
+                name="username"
+                value={username}
                 onChange={handleChange}
-                placeholder="owner@medicalshop.com"
+                placeholder="Enter your username"
                 className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
-                  errors.email ? 'border-red-500' : 'border-gray-300'
+                  errors.username ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
-              {errors.email && (
-                <p className="text-red-600 text-sm mt-1">{errors.email}</p>
+              {errors.username && (
+                <p className="text-red-600 text-sm mt-1">{errors.username}</p>
               )}
             </div>
 

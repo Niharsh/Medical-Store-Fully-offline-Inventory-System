@@ -8,6 +8,7 @@ const SignupPage = () => {
   const { register, ownerExists, loading } = useAuth();
   
   const [formData, setFormData] = useState({
+    username: '',
     email: '',
     firstName: '',
     lastName: '',
@@ -29,10 +30,10 @@ const SignupPage = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      newErrors.email = 'Please enter a valid email';
+    if (!formData.username) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
     }
 
     if (!formData.password) {
@@ -75,9 +76,9 @@ const SignupPage = () => {
     try {
       setIsSubmitting(true);
       await register(
-        formData.email,
+        formData.username,
+        formData.email || '',
         formData.password,
-        formData.passwordConfirm,
         formData.firstName,
         formData.lastName
       );
@@ -85,7 +86,7 @@ const SignupPage = () => {
       // Redirect to dashboard after successful signup
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setGeneralError(err.response?.data?.email?.[0] || 'Signup failed');
+      setGeneralError(err.message || 'Signup failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,10 +119,30 @@ const SignupPage = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
+            {/* Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Shop Email
+                Username
+              </label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="Enter your username"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+                  errors.username ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              {errors.username && (
+                <p className="text-red-600 text-sm mt-1">{errors.username}</p>
+              )}
+            </div>
+
+            {/* Email (Optional) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Shop Email <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
               <input
                 type="email"

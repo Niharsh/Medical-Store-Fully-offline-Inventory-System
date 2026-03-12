@@ -55,153 +55,110 @@ Small medical shops need a simple, dependable system that works even when intern
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, Vite, Tailwind CSS, React Router |
-| Backend | Python, Django, Django REST Framework |
-| Database | SQLite (development) |
+| Backend | Electron Main Process (Node.js) |
+| Database | SQLite (local file) |
 | Packaging | Electron (desktop builds) |
 | Testing | Playwright (acceptance test) |
 
 ---
 
-## 📁 Project folder structure
-
-```
-project-root/
-├── backend/                     # Django project, apps, migrations
-# 🏥 Medical Store Inventory & Billing Management System
-
-A desktop-focused, offline-first medical store billing and inventory system built with Django, React, and Electron. Designed for single-shop operators who need reliable local billing without internet dependency.
-
-## 📌 Overview
-
-This system provides:
-
-- Local billing & invoice printing
-- Batch-based inventory tracking
-- Expiry management
-- Purchase tracking
-- Shop configuration management
-
-Tech stack:
-
-- Django (Backend API & business logic)
-- React (Frontend UI)
-- Electron (Desktop wrapper)
-- SQLite (Local database)
-
-The application is designed to run fully on a local machine without internet access.
-
-## 🏗 Architecture (Current Implementation)
-
-Electron → Django Server (127.0.0.1:8000) → SQLite (local file)
-
-Django serves both API and the built frontend. No cloud dependency.
-
-## 🖥 System Requirements
-
-Before running, install:
-
-1. Python 3.10+ — https://www.python.org/downloads/
-	- Verify: `python --version`
-2. Node.js 18+ — https://nodejs.org/
-	- Verify: `node --version` and `npm --version`
-3. Git (recommended) — https://git-scm.com/
-	- Verify: `git --version`
-
-## 📁 Project Structure
+## 📁 Project structure
 
 ```
 medical-store-inventory-system/
-├── backend/            # Django backend
-├── frontend/           # React source code
-├── electron/           # Electron main process
-├── DOCUMENTATION_AND_GUIDES/
-└── README.md
+├── frontend/           # React source code (Vite + Tailwind)
+├── electron/           # Electron main process & IPC handlers
+├── database/           # SQLite helpers & initialization
+├── public/             # Static assets
+└── README.md           # This file
 ```
 
-## 🚀 How To Run (Development / Local Desktop Mode)
+---
 
-### 1) Clone repository
+## 🚀 Getting started
 
-```bash
-git clone https://github.com/Niharsh/medical-store-inventory-system.git
-cd medical-store-inventory-system
-```
+### Prerequisites
 
-### 2) Backend setup (one-time)
+- Node.js 18 or newer (<https://nodejs.org/>)
+- Git (recommended) - <https://git-scm.com/>
 
-Windows example:
 
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-# Set environment variables (example):
-$env:DJANGO_SECRET_KEY = "your-secret-here"
-$env:EMAIL_HOST_PASSWORD = "your-smtp-password"
-python manage.py migrate
-```
+### Development workflow
 
-macOS / Linux example:
+1. **Clone the repository**
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-export DJANGO_SECRET_KEY="your-secret-here"
-export EMAIL_HOST_PASSWORD="your-smtp-password"
-python manage.py migrate
-```
+   ```bash
+   git clone https://github.com/Niharsh/Medical-Store-Fully-offline-Inventory-System.git
+   cd medical-store-inventory-system
+   ```
 
-### 3) Start backend server
+2. **Install dependencies**
 
-```powershell
-cd backend
-.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
-# Server: http://127.0.0.1:8000/
-```
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
 
-### 4) Run Electron (desktop)
+3. **Run in development mode**
 
-Make sure the Django server above is running. From project root:
+   ```bash
+   npm run dev
+   ```
 
-```bash
-npx electron .
-```
+   This command starts the Vite dev server (default `http://localhost:5173`) and launches
+   the Electron desktop application. Changes to frontend or backend code reload automatically.
 
-> Note: The frontend dev server (`npm run dev`) is only required for frontend development. For desktop usage, Django serves the built frontend files.
+4. **Build for distribution**
 
-## 🧾 Invoice & Print Behavior
+   ```bash
+   npm run build
+   ```
 
-- Half-page optimized layout
-- Exactly 15 line items per page (automatic continuation)
-- Customer DL and Address printed conditionally
-- Shop details pulled from settings
-- GST calculation (CGST + SGST split)
+   Outputs packaged desktop binaries under `dist-electron/` (Windows, macOS, Linux builds
+   depending on configuration).
 
-## 📦 Database
+---
 
-- SQLite local file
-- Offline, migration-controlled schema
+## 🛠 Features overview
 
-## ⚠ Common issues & quick fixes
+- **Offline-first billing & inventory** tailored for single medical shops
+- Batch-based quantity tracking with expiry alerts
+- Invoice creation, printing (thermal/A4) with tax calculations
+- Purchase entry form with automatic stock updates
+- Shop settings and local admin recovery codes
 
-- Port in use: `python manage.py runserver 8001`
-- Electron blank screen: ensure Django server is running before launching Electron
-- CORS/auth issues: check `config/settings.py` (CORS_ALLOWED_ORIGINS) when `DEBUG=True`
+The application runs entirely locally using SQLite; no network or cloud services are
+required once installed.
 
-## 📌 Intended Usage
+---
 
-- Single-shop medical stores
-- Local desktop deployment
-- Offline-first billing
+## 🧩 Technical stack
+
+| Layer     | Technology              |
+|-----------|-------------------------|
+| Frontend  | React 18, Vite, Tailwind CSS |
+| Backend   | Electron main process (Node.js) |
+| Database  | SQLite (local file)     |
+| Packaging | Electron                |
+
+---
+
+## 💡 Troubleshooting
+
+- **Port 5173 occupied** – dev script automatically switches to the next available port.
+- **Electron shows blank window** – ensure the Vite server is running (`npm run dev`).
+- **SQLite locked** – close all instances of the app before restarting.
+
+---
 
 ## 📄 License
 
-MIT License
+This project is released under the MIT License.
 
-## 👨‍💻 Author
+---
+
+## 🙋‍♂️ Author
 
 Niharsh
 

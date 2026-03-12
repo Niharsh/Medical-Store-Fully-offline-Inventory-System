@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import api from '../services/api';
-import { useAuth } from './AuthContext';
 
 const PurchaseBillsContext = createContext();
 
@@ -10,96 +8,135 @@ export const PurchaseBillsProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ✅ FIXED: Check auth state before fetching
-  const { isAuthenticated, loading: authLoading } = useAuth();
-
-  // Fetch all purchase bills
+  // Fetch all purchase bills from SQLite via IPC
   const fetchPurchaseBills = useCallback(async (params = {}) => {
-    // ✅ FIXED: Guard against unauthenticated requests
-    if (authLoading || !isAuthenticated) {
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get(`/purchase-bills/`, { params });
-      setPurchaseBills(Array.isArray(response.data) ? response.data : response.data.results || []);
+      if (!window?.api?.getPurchaseBills) {
+        throw new Error('window.api.getPurchaseBills not available');
+      }
+
+      const response = await window.api.getPurchaseBills();
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to fetch purchase bills');
+      }
+
+      const bills = response.data?.results || response.data || [];
+      setPurchaseBills(Array.isArray(bills) ? bills : []);
     } catch (err) {
-      setError(err.message || 'Failed to fetch purchase bills');
-      console.error('Failed to fetch purchase bills:', err);
+      const message = err.message || 'Failed to fetch purchase bills';
+      setError(message);
+      console.error('[PurchaseBillsContext] fetchPurchaseBills error:', err);
+      setPurchaseBills([]);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, authLoading]);
+  }, []);
 
-  // Fetch purchase summary
+  // Fetch purchase summary from SQLite via IPC
   const fetchSummary = useCallback(async (period = 'month', date = null) => {
-    // ✅ FIXED: Guard against unauthenticated requests
-    if (authLoading || !isAuthenticated) {
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     try {
-      const params = { period };
-      if (date) params.date = date;
-      const response = await api.get(`/purchase-bills/summary/`, { params });
-      // Sanitize NaN values in summary
+      if (!window?.api?.getPurchaseOverview) {
+        throw new Error('window.api.getPurchaseOverview not available');
+      }
+
+      const response = await window.api.getPurchaseOverview(period);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to fetch purchase summary');
+      }
+
+      // Sanitize values in summary
       const sanitizedData = {
-        ...response.data,
-        total_purchases: response.data.total_purchases || 0,
-        total_paid: response.data.total_paid || 0,
-        total_due: (response.data.total_due !== null && response.data.total_due !== undefined) 
+        total_purchases: response.data?.total_purchases || 0,
+        total_paid: response.data?.total_paid || 0,
+        total_due: (response.data?.total_due !== null && response.data?.total_due !== undefined) 
           ? response.data.total_due 
-          : 0
+          : 0,
+        bill_count: response.data?.bill_count || 0,
       };
       setSummary(sanitizedData);
     } catch (err) {
       setError(err.message || 'Failed to fetch purchase summary');
-      console.error('Failed to fetch purchase summary:', err);
+      console.error('[PurchaseBillsContext] fetchSummary error:', err);
+      // Set safe defaults on error
+      setSummary({
+        total_purchases: 0,
+        total_paid: 0,
+        total_due: 0,
+        bill_count: 0,
+      });
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, authLoading]);
+  }, []);
 
-  // Create purchase bill
+  // Create purchase bill via IPC
   const createPurchaseBill = useCallback(async (billData) => {
     try {
-      const response = await api.post(`/purchase-bills/`, billData);
-      setPurchaseBills(prevPurchaseBills => [response.data, ...prevPurchaseBills]);
-      // this line was changed to use functional update to avoid stale closure
-      setPurchaseBills([response.data, ...purchaseBills]);
-      return response.data;
+      if (!window?.api?.createPurchaseBill) {
+        throw new Error('window.api.createPurchaseBill not available');
+      }
+
+      const response = await window.api.createPurchaseBill(billData);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to create purchase bill');
+      }
+
+      const bill = response.data;
+      setPurchaseBills(prevBills => [bill, ...prevBills]);
+      return bill;
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || 'Failed to create purchase bill');
+      console.error('[PurchaseBillsContext] createPurchaseBill error:', err);
       throw err;
     }
-  }, [purchaseBills]);
+  }, []);
 
-  // Update purchase bill
+  // Update purchase bill via IPC
   const updatePurchaseBill = useCallback(async (billId, billData) => {
     try {
-      const response = await api.patch(`/purchase-bills/${billId}/`, billData);
-      setPurchaseBills(purchaseBills.map(bill => bill.id === billId ? response.data : bill));
-      return response.data;
+      if (!window?.api?.updatePurchaseBill) {
+        throw new Error('window.api.updatePurchaseBill not available');
+      }
+
+      const response = await window.api.updatePurchaseBill(billId, billData);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to update purchase bill');
+      }
+
+      const updatedBill = response.data;
+      setPurchaseBills(prevBills => prevBills.map(bill => bill.id === billId ? updatedBill : bill));
+      return updatedBill;
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || 'Failed to update purchase bill');
+      console.error('[PurchaseBillsContext] updatePurchaseBill error:', err);
       throw err;
     }
-  }, [purchaseBills]);
+  }, []);
 
-  // Delete purchase bill
+  // Delete purchase bill via IPC
   const deletePurchaseBill = useCallback(async (billId) => {
     try {
-      await api.delete(`/purchase-bills/${billId}/`);
-      setPurchaseBills(purchaseBills.filter(bill => bill.id !== billId));
+      if (!window?.api?.deletePurchaseBill) {
+        throw new Error('window.api.deletePurchaseBill not available');
+      }
+
+      const response = await window.api.deletePurchaseBill(billId);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to delete purchase bill');
+      }
+
+      setPurchaseBills(prevBills => prevBills.filter(bill => bill.id !== billId));
+      return response.data;
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || 'Failed to delete purchase bill');
+      console.error('[PurchaseBillsContext] deletePurchaseBill error:', err);
       throw err;
     }
-  }, [purchaseBills]);
+  }, []);
 
   // Search purchase bills
   const searchPurchaseBills = useCallback(async (searchTerm) => {

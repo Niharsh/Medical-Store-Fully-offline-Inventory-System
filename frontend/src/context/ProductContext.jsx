@@ -1,7 +1,16 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { productService } from '../services/medicineService';
-import productTypeService from '../services/productTypeService';
-import hsnService from '../services/hsnService';
+
+// Default product types (hardcoded, always available)
+const DEFAULT_PRODUCT_TYPES = [
+  { id: 'tablet', label: 'Tablet', is_default: true },
+  { id: 'syrup', label: 'Syrup', is_default: true },
+  { id: 'powder', label: 'Powder', is_default: true },
+  { id: 'cream', label: 'Cream', is_default: true },
+  { id: 'diaper', label: 'Diaper', is_default: true },
+  { id: 'condom', label: 'Condom', is_default: true },
+  { id: 'sachet', label: 'Sachet', is_default: true },
+];
 
 /**
  * ProductContext - Manages state for generic medical store products
@@ -19,7 +28,7 @@ import hsnService from '../services/hsnService';
  * 
  * Frontend only:
  * - Displays product type
- * - Calls API to fetch/create/update/delete products and product types
+ * - Calls IPC to fetch/create/update/delete products and product types
  * - No type-specific logic in frontend
  */
 const ProductContext = createContext();
@@ -36,12 +45,17 @@ export const ProductProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await productService.getAll(params);
-      const productList = Array.isArray(data) ? data : data.results || [];
-      console.log('📥 ProductContext.fetchProducts: Fetched', productList.length, 'products with batches:', productList);
-      setProducts(productList);
+      // Use IPC to fetch products from SQLite
+      if (window?.api?.getProducts) {
+        const response = await window.api.getProducts();
+        const productList = Array.isArray(response.data) ? response.data : response.data.results || [];
+        console.log('📥 ProductContext.fetchProducts: Fetched', productList.length, 'products with batches:', productList);
+        setProducts(productList);
+      } else {
+        throw new Error('window.api.getProducts is not available');
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || 'Failed to fetch products');
       console.error('Failed to fetch products:', err);
     } finally {
       setLoading(false);
@@ -52,11 +66,43 @@ export const ProductProvider = ({ children }) => {
   const addProduct = useCallback(async (productData) => {
     try {
       setError(null);
-      const newProduct = await productService.create(productData);
-      setProducts(prevProducts => [...prevProducts, newProduct]);
-      return newProduct;
+      if (window?.api?.addProduct) {
+        const response = await window.api.addProduct(productData);
+        
+        if (!response || !response.data) {
+          throw new Error('Invalid response: missing product data');
+        }
+        
+        const newProduct = response.data;
+        
+        // Validate product has required fields
+        if (!newProduct || !newProduct.id || !newProduct.name) {
+          console.error('INVALID PRODUCT:', newProduct);
+          throw new Error('Incomplete product data returned from server');
+        }
+        
+        // Ensure batches and gst_rate exist
+        if (!Array.isArray(newProduct.batches)) {
+          newProduct.batches = [];
+        }
+        if (newProduct.gst_rate === undefined) {
+          newProduct.gst_rate = null;
+        }
+        
+        console.log('Adding product to state:', { id: newProduct.id, name: newProduct.name, batches: newProduct.batches.length });
+        
+        setProducts(prevProducts => {
+          const filtered = prevProducts.filter(p => p && p.id && p.name);
+          return [...filtered, newProduct];
+        });
+        
+        return newProduct;
+      } else {
+        throw new Error('window.api.addProduct is not available');
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      console.error('ProductContext.addProduct error:', err);
+      setError(err.message || 'Failed to add product');
       throw err;
     }
   }, []);
@@ -65,9 +111,17 @@ export const ProductProvider = ({ children }) => {
   const updateProduct = useCallback(async (id, payload) => {
     try {
       setError(null);
-    
-      const updatedProduct = await productService.update(id, payload);
-    
+      
+      if (!window?.api?.updateProduct) {
+        throw new Error('window.api.updateProduct not available');
+      }
+
+      const response = await window.api.updateProduct(id, payload);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to update product');
+      }
+
+      const updatedProduct = response.data;
       setProducts(prev =>
         prev.map(p => (p.id === id ? updatedProduct : p))
       );
@@ -76,23 +130,32 @@ export const ProductProvider = ({ children }) => {
     
       return updatedProduct;
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
-      console.error('❌ Failed to update product:', err);
+      const message = err.message || 'Failed to update product';
+      setError(message);
+      console.error('❌ ProductContext.updateProduct error:', err);
       throw err;
     }
   }, []);
-
-
 
   // Delete product
   const deleteProduct = useCallback(async (id) => {
     try {
       setError(null);
-      await productService.delete(id);
+      
+      if (!window?.api?.deleteProduct) {
+        throw new Error('window.api.deleteProduct not available');
+      }
+
+      const response = await window.api.deleteProduct(id);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to delete product');
+      }
+
       setProducts(prevProducts => prevProducts.filter(p => p.id !== id));
       console.log('✅ ProductContext.deleteProduct: Product', id, 'deleted successfully');
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
+      const message = err.message || 'Failed to delete product';
+      setError(message);
       console.error('❌ ProductContext.deleteProduct: Failed to delete product', id, err);
       throw err;
     }
@@ -108,24 +171,44 @@ export const ProductProvider = ({ children }) => {
     }
   }, []);
 
-  // Fetch all available product types (defaults + custom)
+  // Fetch all available product types (defaults + custom from SQLite)
   const fetchProductTypes = useCallback(async () => {
     try {
-      const types = await productTypeService.getAll();
-      setProductTypes(types);
-      return types;
+      if (!window?.api?.getProductTypes) {
+        throw new Error('window.api.getProductTypes not available');
+      }
+
+      const response = await window.api.getProductTypes();
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to fetch product types');
+      }
+
+      const customTypes = response.data || [];
+      // Merge defaults with custom types
+      const allTypes = [...DEFAULT_PRODUCT_TYPES, ...customTypes];
+      setProductTypes(allTypes);
+      return allTypes;
     } catch (err) {
-      console.error('Failed to fetch product types:', err);
+      console.error('[ProductContext] Failed to fetch product types:', err);
       setError(err.message);
       // Return defaults on error
-      return productTypeService.getDefaults();
+      return DEFAULT_PRODUCT_TYPES;
     }
   }, []);
 
   // Add a new custom product type
   const addProductType = useCallback(async (typeData) => {
     try {
-      const newType = await productTypeService.create(typeData);
+      if (!window?.api?.addProductType) {
+        throw new Error('window.api.addProductType not available');
+      }
+
+      const response = await window.api.addProductType(typeData);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to add product type');
+      }
+
+      const newType = response.data;
       setProductTypes(prevTypes => [...prevTypes, newType]);
       return newType;
     } catch (err) {
@@ -138,7 +221,15 @@ export const ProductProvider = ({ children }) => {
   // Delete a custom product type
   const deleteProductType = useCallback(async (typeId) => {
     try {
-      await productTypeService.delete(typeId);
+      if (!window?.api?.deleteProductType) {
+        throw new Error('window.api.deleteProductType not available');
+      }
+
+      const response = await window.api.deleteProductType(typeId);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to delete product type');
+      }
+
       setProductTypes(prevTypes => prevTypes.filter(t => t.id !== typeId));
     } catch (err) {
       const message = err.message || 'Failed to delete product type';
@@ -150,11 +241,20 @@ export const ProductProvider = ({ children }) => {
   // Fetch all HSN codes
   const fetchHSNs = useCallback(async () => {
     try {
-      const codes = await hsnService.getAll();
+      if (!window?.api?.getHSNCodes) {
+        throw new Error('window.api.getHSNCodes not available');
+      }
+
+      const response = await window.api.getHSNCodes();
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to fetch HSN codes');
+      }
+
+      const codes = response.data || [];
       setHSNs(codes);
       return codes;
     } catch (err) {
-      console.error('Failed to fetch HSN codes:', err);
+      console.error('[ProductContext] Failed to fetch HSN codes:', err);
       setError(err.message);
       return [];
     }
@@ -163,7 +263,16 @@ export const ProductProvider = ({ children }) => {
   // Add a new HSN code
   const addHSN = useCallback(async (hsnData) => {
     try {
-      const newHSN = await hsnService.create(hsnData);
+      if (!window?.api?.addHSNCode) {
+        throw new Error('window.api.addHSNCode not available');
+      }
+
+      const response = await window.api.addHSNCode(hsnData);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to add HSN code');
+      }
+
+      const newHSN = response.data;
       setHSNs(prevHSNs => [...prevHSNs, newHSN]);
       return newHSN;
     } catch (err) {
@@ -176,7 +285,16 @@ export const ProductProvider = ({ children }) => {
   // Update an HSN code
   const updateHSN = useCallback(async (hsnCode, hsnData) => {
     try {
-      const updatedHSN = await hsnService.update(hsnCode, hsnData);
+      if (!window?.api?.updateHSNCode) {
+        throw new Error('window.api.updateHSNCode not available');
+      }
+
+      const response = await window.api.updateHSNCode(hsnCode, hsnData);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to update HSN code');
+      }
+
+      const updatedHSN = response.data;
       setHSNs(prevHSNs => 
         prevHSNs.map(h => h.hsn_code === hsnCode ? updatedHSN : h)
       );
@@ -191,7 +309,15 @@ export const ProductProvider = ({ children }) => {
   // Delete an HSN code
   const deleteHSN = useCallback(async (hsnCode) => {
     try {
-      await hsnService.delete(hsnCode);
+      if (!window?.api?.deleteHSNCode) {
+        throw new Error('window.api.deleteHSNCode not available');
+      }
+
+      const response = await window.api.deleteHSNCode(hsnCode);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to delete HSN code');
+      }
+
       setHSNs(prevHSNs => prevHSNs.filter(h => h.hsn_code !== hsnCode));
     } catch (err) {
       const message = err.message || 'Failed to delete HSN code';

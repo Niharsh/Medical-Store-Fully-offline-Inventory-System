@@ -83,6 +83,7 @@ const ProductList = ({ onEdit, onDelete }) => {
 
       {/* Search Bar with Autocomplete */}
       <ProductAutocomplete 
+        products={products}
         onSelectProduct={handleSelectProduct}
         isLoading={false}
         resultsCount={0}
@@ -112,12 +113,10 @@ const ProductList = ({ onEdit, onDelete }) => {
               </tr>
             </thead>
             <tbody>
-              {products.map(product => {
-                console.log(`🔍 Rendering product: ${product.name}`, {
-                  id: product.id,
-                  batchesCount: product.batches?.length || 0,
-                  batches: product.batches
-                });
+              {products.map((product, idx) => {
+                if (!product || !product.id || !product.name) {
+                  return null;
+                }
                 const totalQty = getTotalQuantity(product.batches);
                 const minMrp = getMinMRP(product.batches);
                 const maxMrp = getMaxMRP(product.batches);

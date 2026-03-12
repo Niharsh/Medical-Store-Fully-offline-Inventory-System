@@ -236,7 +236,7 @@ const InvoicePrint = ({ invoice, shop }) => {
                 <td className="thermal-col-qty">{item.is_return ? '-' : ''}{itemQty}</td>
                 <td className="thermal-col-product">
                   <div className="product-name">
-                    {item.product_name}
+                    {item.product_name && String(item.product_name).trim()}
                     {item.is_return && <span className="return-badge"> [RETURN]</span>}
                   </div>
                   {item.is_return && item.return_reason && (

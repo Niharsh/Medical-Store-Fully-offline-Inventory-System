@@ -1,28 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../services/api';
 
 /**
- * ProductAutocomplete - Backend-powered autocomplete search
+ * ProductAutocomplete - Local filtering for product search
  * 
  * Features:
- * - Real-time search using backend /api/products/?search=
- * - Typing ONE letter fetches matching products from backend
- * - Case-insensitive search (handled by Django REST Framework)
- * - NO page refresh, NO input reset
+ * - Receives products from props (ProductContext) - no local loading
+ * - Real-time local filtering as user types
+ * - Case-insensitive startsWith() search on product name
+ * - NO backend calls on keypress
  * - Select from dropdown to trigger edit
  * - Keyboard navigation (arrow keys, Enter, Escape)
  * - Click outside to close dropdown
  */
-const ProductAutocomplete = ({ onSelectProduct, isLoading, resultsCount }) => {
+const ProductAutocomplete = ({ products = [], onSelectProduct, isLoading, resultsCount }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [localLoading, setLocalLoading] = useState(false);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Fetch products from backend when input changes
+  // Filter products locally when input changes OR when products prop changes
   useEffect(() => {
     // If input is empty, close dropdown
     if (!inputValue || inputValue.trim().length === 0) {
@@ -32,47 +30,17 @@ const ProductAutocomplete = ({ onSelectProduct, isLoading, resultsCount }) => {
       return;
     }
 
-    // Debounce search: wait 300ms after user stops typing
-    const timeout = setTimeout(async () => {
-      try {
-        console.log(`🔍 Searching backend for: "${inputValue}"`);
-        setLocalLoading(true);
+    // Perform local filtering using startsWith (case-insensitive)
+    const searchTerm = inputValue.trim().toLowerCase();
+    const filtered = products.filter(product =>
+      product.name.toLowerCase().startsWith(searchTerm)
+    );
 
-        // Use the SAME endpoint that ProductContext uses
-        // Django REST Framework SearchFilter handles case-insensitive matching
-        const response = await api.get('/products/', {
-          params: {
-            search: inputValue.trim(),
-          },
-        });
-
-        console.log(`✅ Backend response received`);
-
-        // Extract items from response (could be array or paginated)
-        const items = Array.isArray(response.data)
-          ? response.data
-          : response.data.results || [];
-
-        console.log(`📦 Found ${items.length} matching products`);
-
-        setSuggestions(items);
-        setIsOpen(items.length > 0);
-        setHighlightedIndex(-1);
-      } catch (error) {
-        console.error('❌ Search error:', error);
-        // Gracefully handle errors - don't crash
-        setSuggestions([]);
-        setIsOpen(false);
-      } finally {
-        setLocalLoading(false);
-      }
-    }, 300);
-
-    // Cleanup timeout on component unmount or when input changes
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [inputValue]);
+    console.log(`🔍 Local filter: "${inputValue}" → ${filtered.length} results`);
+    setSuggestions(filtered);
+    setIsOpen(filtered.length > 0);
+    setHighlightedIndex(-1);
+  }, [inputValue, products]);
 
   // Handle input change - NEVER clears automatically
   const handleInputChange = (e) => {
@@ -203,7 +171,7 @@ const ProductAutocomplete = ({ onSelectProduct, isLoading, resultsCount }) => {
         )}
 
         {/* Loading Indicator */}
-        {(localLoading || isLoading) && (
+        {isLoading && (
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
             <span className="text-xs text-gray-500">Loading...</span>
@@ -211,7 +179,7 @@ const ProductAutocomplete = ({ onSelectProduct, isLoading, resultsCount }) => {
         )}
 
         {/* Results Count */}
-        {!localLoading && !isLoading && inputValue && suggestions.length > 0 && (
+        {!isLoading && inputValue && suggestions.length > 0 && (
           <span className="text-sm font-medium text-gray-600">
             {suggestions.length} match{suggestions.length !== 1 ? 'es' : ''}
           </span>
@@ -252,7 +220,7 @@ const ProductAutocomplete = ({ onSelectProduct, isLoading, resultsCount }) => {
       )}
 
       {/* No Results Message */}
-      {isOpen && inputValue && suggestions.length === 0 && !localLoading && (
+      {isOpen && inputValue && suggestions.length === 0 && !isLoading && (
         <div className="absolute top-full left-4 right-4 mt-2 bg-white border border-gray-300 rounded-md shadow-lg z-50 px-4 py-3 text-sm text-gray-500">
           No products found matching "{inputValue}"
         </div>

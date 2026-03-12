@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import api from "../../services/api";
 
 const ShopDetails = () => {
   const [form, setForm] = useState({
@@ -19,21 +18,29 @@ const ShopDetails = () => {
   useEffect(() => {
     const fetchShopDetails = async () => {
       try {
-        const res = await api.get("/shop-profile/");
-        if (res.data) {
+        if (!window?.api?.getSettings) {
+          console.warn('[ShopDetails] window.api.getSettings not available');
+          setLoading(false);
+          return;
+        }
+
+        const response = await window.api.getSettings();
+        console.log('[ShopDetails] getSettings response:', response);
+
+        if (response && response.success !== false && response.data) {
           const shopData = {
-            shop_name: res.data.shop_name || "",
-            owner_name: res.data.owner_name || "",
-            phone: res.data.phone || "",
-            address: res.data.address || "",
-            gst_number: res.data.gst_number || "",
-            dl_number: res.data.dl_number || "",
+            shop_name: response.data.shop_name || "",
+            owner_name: response.data.owner_name || "",
+            phone: response.data.phone || "",
+            address: response.data.address || "",
+            gst_number: response.data.gst_number || "",
+            dl_number: response.data.dl_number || "",
           };
-          setFetchedData(res.data);
+          setFetchedData(response.data);
           setForm(shopData);
         }
       } catch (err) {
-        console.log("No existing shop profile (GET returned error), starting fresh");
+        console.log("[ShopDetails] No existing shop profile, starting fresh", err);
         setFetchedData(null);
       } finally {
         setLoading(false);
@@ -53,7 +60,11 @@ const ShopDetails = () => {
     setMessage({ type: "", text: "" });
 
     try {
-      // Merge fetched data with current form state to preserve all fields
+      if (!window?.api?.saveSettings) {
+        throw new Error('window.api.saveSettings not available');
+      }
+
+      // Prepare payload with current form state
       const payload = {
         shop_name: form.shop_name || fetchedData?.shop_name || "",
         owner_name: form.owner_name || fetchedData?.owner_name || "",
@@ -63,14 +74,16 @@ const ShopDetails = () => {
         dl_number: form.dl_number || fetchedData?.dl_number || "",
       };
 
-      // POST the complete payload (backend treats this as create-or-replace)
-      const response = await api.post(
-        "/shop-profile/",
-        payload
-      );
+      console.log('[ShopDetails] Calling saveSettings with:', payload);
+      const response = await window.api.saveSettings(payload);
+      console.log('[ShopDetails] saveSettings response:', response);
 
-      // Update local state with the response from backend
-      if (response.data) {
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Save failed');
+      }
+
+      // Update local state with the response from IPC
+      if (response && response.data) {
         const updatedData = {
           shop_name: response.data.shop_name || "",
           owner_name: response.data.owner_name || "",
@@ -95,8 +108,6 @@ const ShopDetails = () => {
       }, 3000);
     } catch (error) {
       const errorMsg =
-        error.response?.data?.detail ||
-        error.response?.data?.message ||
         error.message ||
         "Failed to save shop details";
 
@@ -105,7 +116,7 @@ const ShopDetails = () => {
         text: `Error: ${errorMsg}`,
       });
 
-      console.error("Shop profile save error:", error);
+      console.error("[ShopDetails] Save error:", error);
     } finally {
       setSaving(false);
     }

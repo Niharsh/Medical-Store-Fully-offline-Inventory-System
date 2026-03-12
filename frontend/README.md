@@ -1,8 +1,8 @@
-# Generic Medical Store Inventory & Billing System - Frontend
+# Medical Store Inventory & Billing System - Frontend
 
-**Status**: ✅ Ready for Django REST Framework Backend Integration (Zero Refactor Guarantee)
+**Status**: ✅ Production-ready Electron + React + SQLite desktop application
 
-A frontend-first React application for managing medical store inventory and billing for ANY product type (tablets, syrups, powders, creams, diapers, condoms, sachets, etc.), built with **Vite**, **Tailwind CSS**, and **Axios**. This frontend is designed to work seamlessly with a Django REST Framework backend—**no frontend code changes needed once the backend is ready**.
+A React application for managing medical store inventory and billing for any product type (tablets, syrups, powders, creams, diapers, condoms, sachets, etc.), built with **Vite**, **Tailwind CSS**, and **Electron IPC**. This frontend is fully integrated with the Electron desktop application and SQLite database.
 
 ## ⚠️ Important: Frontend-Backend Separation
 

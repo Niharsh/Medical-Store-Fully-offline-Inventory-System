@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import api from '../services/api';
 
 const ProductSearch = () => {
   const [searchParams] = useSearchParams();
@@ -20,11 +19,18 @@ const ProductSearch = () => {
     setError('');
     try {
       console.log('🔍 Searching products with query:', query);
-      // Backend search includes name, generic_name, manufacturer, salt_composition
-      const response = await api.get(`/products/?search=${encodeURIComponent(query)}`);
       
-      // Handle paginated or direct response
-      const data = response.data.results || response.data || [];
+      if (!window?.api?.searchProducts) {
+        throw new Error('window.api.searchProducts not available');
+      }
+
+      const response = await window.api.searchProducts(query);
+      if (response && response.success === false) {
+        throw new Error(response.message || 'Failed to search products');
+      }
+
+      // Handle response data
+      const data = response.data?.results || response.data || [];
       console.log('✅ Search results:', data);
       
       setResults(Array.isArray(data) ? data : []);

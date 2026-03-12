@@ -14,7 +14,7 @@ const WholesalersManager = ({ disabled = false }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (!formData.name.trim()) {
       setMessage('Wholesaler name is required');
       return;
@@ -32,11 +32,17 @@ const WholesalersManager = ({ disabled = false }) => {
 
     try {
       if (editingId) {
-        updateWholesaler(editingId, formData.name, formData.contactNumber, formData.gstNumber);
+        await updateWholesaler(editingId, formData.name, formData.contactNumber, formData.gstNumber);
         setMessage('Wholesaler updated successfully');
         setEditingId(null);
       } else {
         // Add new wholesaler and capture the returned wholesaler object
+        console.log('📝 Calling addWholesaler with:', {
+          name: formData.name,
+          phone: formData.contactNumber,
+          gstNumber: formData.gstNumber,
+        });
+
         const newWholesaler = await addWholesaler({
           name: formData.name,
           phone: formData.contactNumber,
@@ -44,10 +50,14 @@ const WholesalersManager = ({ disabled = false }) => {
         });
 
         console.log('✅ New wholesaler created:', newWholesaler);
-        console.log('📝 Setting selectedWholesalerId to:', newWholesaler.id);
-
-        setSelectedWholesalerId(newWholesaler.id);
-        setMessage('Wholesaler added successfully');
+        if (!newWholesaler || !newWholesaler.id) {
+          console.error('addWholesaler did not return valid wholesaler:', newWholesaler);
+          setMessage('Could not create wholesaler');
+        } else {
+          console.log('📝 Setting selectedWholesalerId to:', newWholesaler.id);
+          setSelectedWholesalerId(newWholesaler.id);
+          setMessage('Wholesaler added successfully');
+        }
       }
       setFormData({ name: '', contactNumber: '', gstNumber: '' });
       setShowForm(false);
@@ -60,27 +70,32 @@ const WholesalersManager = ({ disabled = false }) => {
 
   const handleEdit = (wholesaler) => {
     setEditingId(wholesaler.id);
-    setFormData({ name: wholesaler.name, contactNumber: wholesaler.contactNumber });
+    setFormData({ name: wholesaler.name, contactNumber: wholesaler.contactNumber || '', gstNumber: wholesaler.gstNumber || '' });
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
-  if (window.confirm('Are you sure you want to delete this wholesaler?')) {
-    deleteWholesaler(id);
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this wholesaler?')) {
+      try {
+        await deleteWholesaler(id);
 
-    if (id === selectedWholesalerId) {
-      setSelectedWholesalerId(null);
-    }
-
-    setMessage('Wholesaler deleted successfully');
-    setTimeout(() => setMessage(''), 2000);
+        if (id === selectedWholesalerId) {
+          setSelectedWholesalerId(null);
         }
-    };
+
+        setMessage('Wholesaler deleted successfully');
+        setTimeout(() => setMessage(''), 2000);
+      } catch (err) {
+        setMessage('Error deleting wholesaler');
+        console.error(err);
+      }
+    }
+  };
 
   const handleCancel = () => {
     setShowForm(false);
     setEditingId(null);
-    setFormData({ name: '', contactNumber: '' });
+    setFormData({ name: '', contactNumber: '', gstNumber: '' });
   };
 
   const selectedWholesaler = wholesalers.find(w => w.id === selectedWholesalerId);

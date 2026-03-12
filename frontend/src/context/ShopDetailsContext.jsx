@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import api from '../services/api';
-import { useAuth } from './AuthContext';
 
 const ShopDetailsContext = createContext();
 
@@ -9,28 +7,52 @@ export const ShopDetailsProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // ✅ FIXED: Check auth state before fetching
-  const { isAuthenticated, loading: authLoading } = useAuth();
-
   useEffect(() => {
-    // ✅ FIXED: Only fetch when authenticated
-    if (authLoading || !isAuthenticated) {
-      return;
-    }
-
     const fetchShopDetails = async () => {
       try {
-        const res = await api.get('/shop-profile/');
-        setShop(res.data);
+        setLoading(true);
+        setError('');
+
+        if (!window?.api?.getSettings) {
+          throw new Error('window.api.getSettings not available');
+        }
+
+        const response = await window.api.getSettings();
+        if (response && response.success === false) {
+          throw new Error(response.message || 'Failed to fetch shop settings');
+        }
+
+        // Map the database field names to shop object
+        const settings = response.data;
+        const shopData = {
+          shop_name: settings.shop_name || 'Medical Store',
+          owner_name: settings.owner_name || '',
+          phone: settings.phone || '',
+          address: settings.address || '',
+          gst_number: settings.gst_number || '',
+          dl_number: settings.dl_number || '',
+        };
+
+        setShop(shopData);
       } catch (err) {
-        setError('Failed to load shop details');
+        console.error('[ShopDetailsContext] Error fetching shop settings:', err);
+        setError(err.message || 'Failed to load shop details');
+        // Set default shop data on error
+        setShop({
+          shop_name: 'Medical Store',
+          owner_name: '',
+          phone: '',
+          address: '',
+          gst_number: '',
+          dl_number: '',
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchShopDetails();
-  }, [isAuthenticated, authLoading]);
+  }, []);
 
   return (
     <ShopDetailsContext.Provider value={{ shop, loading, error }}>

@@ -17,13 +17,10 @@ import ProductSearch from './pages/ProductSearch';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import RecoveryMethodSelection from './pages/RecoveryMethodSelection';
-import AdminRecoveryIntro from './pages/AdminRecoveryIntro';
-import AdminCodeVerify from './pages/AdminCodeVerify';
+import ActivationPage from './pages/ActivationPage';
 import './App.css';
+import ErrorBoundary from './components/Common/ErrorBoundary';
 import ShopDetails from './components/Settings/ShopDetails';
-import AdminPasswordReset from './pages/AdminPasswordReset';
 
 
 // Inner app component that uses auth context
@@ -58,13 +55,9 @@ function AppContent() {
     return (
       <Router>
         <Routes>
+          <Route path="/activate" element={<ActivationPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/forgot-password" element={<RecoveryMethodSelection />} />
-          <Route path="/forgot-password/email" element={<ForgotPasswordPage />} />
-          <Route path="/forgot-password/admin" element={<AdminRecoveryIntro />} />
-          <Route path="/forgot-password/admin/verify" element={<AdminCodeVerify />} />
-          <Route path="/forgot-password/admin/reset" element={<AdminPasswordReset />} />
-          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
@@ -85,6 +78,9 @@ function AppContent() {
                     <Navigation />
                   </div>
                   <Routes>
+                    {/* License Activation - accessible anytime while logged in */}
+                    <Route path="/activate" element={<ActivationPage />} />
+                    
                     {/* Dashboard */}
                     <Route 
                       path="/dashboard" 
@@ -170,7 +166,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </AuthProvider>
   );
 }

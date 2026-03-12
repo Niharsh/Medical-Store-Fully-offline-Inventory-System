@@ -21,10 +21,10 @@ NC='\033[0m' # No Color
 
 # Step 1: Verify project structure
 echo -e "${YELLOW}Step 1: Verifying project structure...${NC}"
-if [ -d "frontend" ] && [ -d "backend" ] && [ -d "electron" ]; then
+if [ -d "frontend" ] && [ -d "electron" ]; then
     echo -e "${GREEN}✓ Project structure verified${NC}"
 else
-    echo -e "${RED}✗ Missing directories. Expected: frontend/, backend/, electron/${NC}"
+    echo -e "${RED}✗ Missing directories. Expected: frontend/, electron/${NC}"
     exit 1
 fi
 
@@ -97,23 +97,13 @@ fi
 echo ""
 echo -e "${YELLOW}Step 8: Verifying Vite configuration...${NC}"
 if grep -q "outDir: 'dist'" frontend/vite.config.js; then
-    echo -e "${GREEN}✓ Vite config updated for Electron${NC}"
+    echo -e "${GREEN}✓ Vite config verified${NC}"
 else
-    echo -e "${RED}✗ Vite config needs update${NC}"
+    echo -e "${RED}✗ Vite config not found${NC}"
     exit 1
 fi
 
-# Step 9: Check if backend is running
-echo ""
-echo -e "${YELLOW}Step 9: Checking if backend is accessible...${NC}"
-if timeout 5 python -c "import socket; sock = socket.socket(); sock.connect(('127.0.0.1', 8000))" 2>/dev/null; then
-    echo -e "${GREEN}✓ Backend is running on port 8000${NC}"
-else
-    echo -e "${YELLOW}⚠ Backend not running on port 8000 (this is OK for dev setup)${NC}"
-    echo -e "${YELLOW}   Start it separately: cd backend && python manage.py runserver 0.0.0.0:8000${NC}"
-fi
-
-# Step 10: Display startup instructions
+# Step 9: Display startup instructions
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✓ All checks passed! System ready for development${NC}"
@@ -121,11 +111,7 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo -e "${YELLOW}📋 NEXT STEPS:${NC}"
 echo ""
-echo "1️⃣  Start Backend (Terminal 1):"
-echo -e "   ${YELLOW}cd $PROJECT_DIR/backend${NC}"
-echo -e "   ${YELLOW}python manage.py runserver 0.0.0.0:8000${NC}"
-echo ""
-echo "2️⃣  Start Development (Terminal 2):"
+echo "1️⃣  Start Development (Terminal 1):"
 echo -e "   ${YELLOW}cd $PROJECT_DIR${NC}"
 echo -e "   ${YELLOW}npm run dev${NC}"
 echo ""
