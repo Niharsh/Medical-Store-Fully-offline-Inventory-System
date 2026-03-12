@@ -17,13 +17,13 @@
     "dist": "npm run build && electron-builder",
     "dist:portable": "npm run build && electron-builder -p never",
     "pack": "electron-builder --dir",
-    "prestart": "npm run build"
+    "prestart": "npm run build",
+    "postinstall": "electron-builder install-app-deps"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "electron": "^27.3.11",
+    "electron": "27.3.11",
     "electron-builder": "^24.9.1",
-    "electron-rebuild": "^3.2.9",
     "wait-on": "^7.2.0"
   },
   "build": {
@@ -33,10 +33,16 @@
       "buildResources": "frontend/public",
       "output": "dist-electron"
     },
+    // unpack database folder and native modules to avoid asar path issues
+    "asarUnpack": [
+      "database/**",
+      "node_modules/better-sqlite3/**"
+    ],
     "files": [
       "electron/**/*",
+      "database/**/*",
       "frontend/dist/**/*",
-      "node_modules/**/*"
+      "package.json"
     ],
     "win": {
       "target": [
@@ -58,6 +64,6 @@
     }
   },
   "dependencies": {
-    "better-sqlite3": "^8.7.0"
+    "better-sqlite3": "8.7.0"
   }
 }

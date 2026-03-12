@@ -4,7 +4,20 @@ const fs = require("fs");
 const net = require("net");
 // ensure correct resolution both during development (file system) and
 // packaged inside app.asar
-const dbPath = path.join(__dirname, '..', 'database', 'db');
+// compute path to database module in a packaging-friendly way
+// during development __dirname points to electron/ folder, in production
+// it points inside app.asar. app.getAppPath() returns the asar root path.
+function resolveDatabasePath() {
+  // choose base according to whether the app is packaged; app.getAppPath()
+  // works both in dev and prod but may include 'app.asar' when packaged.
+  const base = app.isPackaged ? app.getAppPath() : __dirname;
+  // path to the JS file (extension optional)
+  const candidate = path.join(base, '..', 'database', 'db');
+  console.log('[electron] resolveDatabasePath ->', candidate, 'exists=', fs.existsSync(candidate));
+  return candidate;
+}
+
+const dbPath = resolveDatabasePath();
 const db = require(dbPath);
 const { initializeLicense, activateLicense } = require("./licensing/licenseValidator");
 
