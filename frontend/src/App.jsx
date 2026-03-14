@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProductProvider } from './context/ProductContext';
 import { InvoiceProvider } from './context/InvoiceContext';
@@ -27,6 +27,21 @@ import ShopDetails from './components/Settings/ShopDetails';
 function AppContent() {
   const { auth, ownerExists, loading } = useAuth();
 
+  // check if we're in activation window (hash #activate) - if so, show activation page regardless of auth state
+  const isActivationWindow = window.location.hash === '#activate' || window.location.hash === '#/activate';
+
+  // if activation window, show activation page only
+  if (isActivationWindow) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/activate" element={<ActivationPage />} />
+          <Route path="*" element={<Navigate to="/activate" replace />} />
+        </Routes>
+      </Router>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -43,6 +58,7 @@ function AppContent() {
     return (
       <Router>
         <Routes>
+          <Route path="/activate" element={<ActivationPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="*" element={<Navigate to="/signup" replace />} />
         </Routes>

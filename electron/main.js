@@ -32,6 +32,8 @@ let mainWindow;
 let activationWindow;
 let licenseValid = false;  // Track if license is validated
 let activationComplete = false; // Track if activation process is complete
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-http-cache');
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -110,12 +112,14 @@ function createWindow() {
       })
       .connect({ host, port });
 }  else {
-      // Frontend is now in extraResources, outside asar
-      const prodFile = path.join(process.resourcesPath, 'frontend', 'dist', 'index.html');
-      console.log('[electron] prodFile:', prodFile, 'exists:', fs.existsSync(prodFile));
-      mainWindow.loadFile(prodFile)
-        .then(() => console.log('[electron] loadFile success'))
-        .catch(err => console.error('[electron] loadFile error:', err));
+    const prodFile = path.join(process.resourcesPath, 'frontend', 'dist', 'index.html');
+    console.log('[electron] prodFile:', prodFile, 'exists:', fs.existsSync(prodFile));
+
+    mainWindow.webContents.openDevTools(); // ← TEMPORARY: remove after testing
+
+    mainWindow.loadFile(prodFile)
+      .then(() => console.log('[electron] loadFile success'))
+      .catch(err => console.error('[electron] loadFile error:', err));
   }
 
   // Prevent external navigation in production
@@ -164,14 +168,36 @@ function createActivationWindow() {
     height: 800,
     minWidth: 500,
     minHeight: 700,
+    show: false, // ← Don't show until ready
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
+      // ↓ Fix GPU cache errors
+      backgroundThrottling: false,
     },
     ...(fs.existsSync(path.join(__dirname, "../unamed.ico")) && {
       icon: path.join(__dirname, "../unamed.ico"),
     }),
+  });
+
+  // Only show window when page is ready
+  activationWindow.once('ready-to-show', () => {
+    activationWindow.show();
+    console.log('[license-window] Window ready and shown');
+  });
+
+  //debug events for activation window
+  activationWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[license-window] did-fail-load:', errorCode, errorDescription);
+  });
+  
+  activationWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('[license-window] render-process-gone:', details.reason, details.exitCode);
+  });
+  
+  activationWindow.webContents.on('crashed', (event, killed) => {
+    console.error('[license-window] crashed, killed:', killed);
   });
 
   // Prevent closing window without valid license
@@ -185,23 +211,29 @@ function createActivationWindow() {
   // Load activation page
   if (!app.isPackaged) {
     activationWindow.loadURL('http://localhost:5173/#/activate')
+      .then(() => console.log('[license-window] loadURL success'))
       .catch(err => console.error('[license-window] loadURL error:', err));
   } else {
       // Frontend is now in extraResources, outside asar
       const prodFile = path.join(process.resourcesPath, 'frontend', 'dist', 'index.html');
       console.log('[license-window] prodFile:', prodFile, 'exists:', fs.existsSync(prodFile));
-      
+
+      activationWindow.webContents.openDevTools(); // ← TEMPORARY: remove after testing      
       activationWindow.loadFile(prodFile, { hash: 'activate' })
       .then(() => console.log('[license-window] loadFile success'))
       .catch(err => console.error('[license-window] loadFile error:', err));
   }
 
   activationWindow.on("closed", () => {
-    activationWindow = null;
-    // If activation window closed without activation, quit app
-    console.log('[license-window] Closed - quitting app');
+  activationWindow = null;
+  // Only quit if activation was NOT completed
+  if (!activationComplete) {
+    console.log('[license-window] Closed without activation - quitting app');
     app.quit();
-  });
+  } else {
+    console.log('[license-window] Closed after activation - main window should be open');
+  }
+});
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -224,8 +256,11 @@ ipcMain.handle("activate-license", async (event, licenseKey) => {
       if (activationWindow) {
         activationWindow.destroy(); // destroy() bypasses close event
       }
-
-      createWindow(); // Create main app window
+      
+      // small delay to ensure activation window is closed before opening main window
+      setTimeout(() => {
+        createWindow(); // Create main app window
+      }, 500);
 
       return {
         success: true,
@@ -949,7 +984,7 @@ ipcMain.on('renderer-error', (event, info) => {
 
 // App lifecycle
 app.whenReady().then(async () => {
-  
+
   // Initialize database before creating window
   try {
     await db.initializeDatabase();
@@ -982,26 +1017,35 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", async () => {
+  // Don't quit if activation just completed and main window is created
+  if (activationComplete && !mainWindow) {
+    console.log('[app] window-all-closed ignored - main window being created');
+    return;
+  }
+
+
+  // Don't quit if activation is in progress
+  if (!licenseValid && !activationComplete) {
+    console.log('[app] window-all-closed ignored - waiting for activation');
+    return;
+  }
+
   // Auto-backup database before exit
   try {
     const userDataPath = app.getPath("userData");
     const dbPath = path.join(userDataPath, "medical_store.db");
     const backupsDir = path.join(userDataPath, "backups");
 
-    // Check if database exists
     if (fs.existsSync(dbPath)) {
-      // Create backups directory if it doesn't exist
       if (!fs.existsSync(backupsDir)) {
         fs.mkdirSync(backupsDir, { recursive: true });
       }
 
-      // Generate backup filename with timestamp
       const now = new Date();
       const timestamp = now.toISOString().replace(/[:.]/g, '-').split('Z')[0];
       const backupFilename = `auto_backup_${timestamp}.db`;
       const backupPath = path.join(backupsDir, backupFilename);
 
-      // Copy database to backups folder
       await new Promise((resolve, reject) => {
         fs.copyFile(dbPath, backupPath, (err) => {
           if (err) {
@@ -1014,7 +1058,6 @@ app.on("window-all-closed", async () => {
         });
       });
 
-      // Clean up old backups (keep only last 7)
       const files = fs.readdirSync(backupsDir)
         .filter(file => file.startsWith('auto_backup_'))
         .map(file => ({
@@ -1025,7 +1068,6 @@ app.on("window-all-closed", async () => {
         .sort((a, b) => b.time - a.time);
 
       if (files.length > 7) {
-        // Delete old backups
         for (let i = 7; i < files.length; i++) {
           try {
             fs.unlinkSync(files[i].path);
@@ -1040,7 +1082,6 @@ app.on("window-all-closed", async () => {
     console.error('[auto-backup] Error during auto-backup:', err);
   }
 
-  // On Windows & Linux quit fully when all windows closed
   if (process.platform !== "darwin") app.quit();
 });
 

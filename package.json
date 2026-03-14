@@ -31,20 +31,22 @@
     "appId": "com.choudharymedical.billing",
     "productName": "Choudhary Medical Store",
     "directories": {
-      "buildResources": "frontend/public",
       "output": "dist-electron"
     },
     "icon": "unamed.ico",
+    "asar": true,
     "extraResources": [
-    {
-      "from": "database",
-      "to": "database",
-      "filter": ["**/*"]
-    },
-    {"from":"frontend/dist",
-    "to":"frontend/dist",
-    "filter":["**/*"]}
-  ],
+      {
+        "from": "database",
+        "to": "database",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "frontend/dist",
+        "to": "frontend/dist",
+        "filter": ["**/*"]
+      }
+    ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**",
       "node_modules/bindings/**",
@@ -52,19 +54,12 @@
     ],
     "files": [
       "electron/**/*",
-      "frontend/dist/**/*",
-      "node_modules/better-sqlite3/**/*",
-      "node_modules/bindings/**/*",
-      "node_modules/file-uri-to-path/**/*",
       "unamed.ico",
       "package.json"
     ],
     "win": {
       "icon": "unamed.ico",
-      "target": [
-        "nsis",
-        "portable"
-      ],
+      "target": ["nsis", "portable"],
       "certificateFile": null,
       "certificatePassword": null
     },
