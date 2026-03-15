@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld("api", {
   print: (options = {}) => ipcRenderer.invoke("print", options),
   
   // Products
+  addProduct: (productData) => ipcRenderer.invoke("add-product", productData),
   getProducts: () => ipcRenderer.invoke("get-products"),
   searchProducts: (query) => ipcRenderer.invoke("search-products", query),
   updateProduct: (productId, productData) => ipcRenderer.invoke("update-product", productId, productData),

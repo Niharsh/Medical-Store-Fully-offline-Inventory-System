@@ -148,38 +148,40 @@ export const AuthProvider = ({ children }) => {
   const resetPasswordWithRecoveryCode = async (username, recoveryCode, newPassword) => {
     try {
       setError(null);
-
+    
       if (!window?.api?.resetPasswordRecovery) {
         throw new Error('IPC API not available');
       }
-
+    
       const response = await window.api.resetPasswordRecovery(
         username,
         recoveryCode,
         newPassword
       );
-
+    
       if (!response.success) {
         throw new Error(response.message || 'Password reset failed');
       }
-
-
-      // Auto-login after successful reset
-      localStorage.setItem('offline_session', JSON.stringify({ 
-        username: response.data.username, 
-        created_at: Date.now() 
-      }));
-
-      setOwner(response.data);
+    
+      // ✅ DO NOT auto-login after reset
+      // ✅ DO NOT setOwner() - would trigger Dashboard redirect
+      // ✅ DO NOT save offline_session - user must login fresh
+    
+      // Clear any existing stale session just in case
+      localStorage.removeItem('offline_session');
+    
       console.log('[auth] Password reset successful');
-
-      return response.data;
+    
+      // Return success flag so ForgotPasswordPage can navigate to /login
+      return { success: true, message: 'Password reset successfully' };
+    
     } catch (err) {
       const errorMsg = err.message || 'Password reset failed';
       setError(errorMsg);
       throw err;
     }
   };
+
 
   const value = {
     owner,

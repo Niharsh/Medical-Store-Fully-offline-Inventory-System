@@ -268,6 +268,7 @@ const AddProductForm = ({ onProductAdded, editingProduct }) => {
           generic_name: '',
           manufacturer: '',
           salt_composition: '',
+          min_stock_level: '',
           unit: 'pc',
           description: '',
           batches: [],
